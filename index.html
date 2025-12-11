@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>G-MIND 통합 역량 인증 시스템</title>
-    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@300;400;700;900&family=Nanum+Myeongjo:wght@700;800&display=swap" rel="stylesheet">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -13,7 +14,7 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // [핵심 수정] 선생님이 찾아내신 열쇠를 이곳에 심었습니다.
+        // [중요] 선생님이 제공해주신 올바른 키값을 여기에 적용했습니다.
         const firebaseConfig = {
             apiKey: "AIzaSyBbb1jaysjUlBjb4wFzoxQK789QQOT79GA",
             authDomain: "g-mind-78c4a.firebaseapp.com",
@@ -24,13 +25,15 @@
             measurementId: "G-RJ16KGZY9N"
         };
 
+        // 앱 초기화
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         
-        // 데이터가 저장될 폴더 이름 (학교별 구분용, 여기서는 고정)
+        // 전역 변수 설정 (학교 앱 ID)
         const appId = 'gmind-school-app'; 
         
+        // 윈도우 전역 객체에 할당 (HTML 버튼에서 함수를 부르기 위해 필수)
         window.currentStudentId = null;
         window.classData = []; 
         window.teacherName = localStorage.getItem('gmind_teacher_name') || '';
@@ -45,13 +48,15 @@
                 await signInAnonymously(auth);
             } catch (e) {
                 console.error("Auth Error:", e);
-                updateStatus("서버 설정 확인 필요(콘솔)", "error");
+                // 에러 발생 시 화면에 빨간 글씨로 표시
+                updateStatus("서버 키 오류: 콘솔(F12)을 확인하세요.", "error");
             }
         }
 
-        // 2. 접속 상태 감지
+        // 2. 접속 상태 감지 (로그인 성공 시 실행됨)
         onAuthStateChanged(auth, (user) => {
             if (user) {
+                console.log("Firebase Connected:", user.uid);
                 updateStatus("🟢 서버 정상 연결됨", "success");
                 window.authReady = true;
                 loadClassList();
@@ -60,20 +65,24 @@
             }
         });
 
+        // 실행
         initAuth();
 
+        // 3. 주요 기능 함수들
         window.loadClassList = async function() {
             if (!window.authReady) return;
             const storedClass = localStorage.getItem('gmind_class_list_v4');
             if (storedClass) {
                 window.classData = JSON.parse(storedClass);
             } else {
+                // 초기 데이터 샘플
                 window.classData = [
                     { id: '1101', name: '김철수', dept: '정밀기계과', total: 0, grade: 'Ready' },
                     { id: '1102', name: '이영희', dept: '자동화시스템과', total: 85, grade: 'S' }
                 ];
                 saveClassLocal();
             }
+            // 선생님 이름이 있으면 대시보드로, 없으면 로그인 화면으로
             if(window.teacherName) showDashboard(); else showLogin();
         };
 
@@ -130,6 +139,7 @@
             views.forEach(id => document.getElementById(id).style.display = 'none');
         }
 
+        // 학생 선택 및 데이터 로드
         window.selectStudent = async function(id) {
             window.currentStudentId = id;
             const student = window.classData.find(s => s.id === id);
@@ -141,7 +151,7 @@
                     const docRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'gmind_records_v4', id);
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) data = docSnap.data();
-                } catch (e) { console.error(e); }
+                } catch (e) { console.error("Data Load Error:", e); }
             }
 
             if (window.isEditMode) {
@@ -181,8 +191,9 @@
             window.calc();
         }
 
+        // 학생 데이터 저장
         window.saveStudent = async function() {
-            if (!window.authReady) { alert("서버 미연결 상태입니다."); return; }
+            if (!window.authReady) { alert("서버 미연결 상태입니다. 잠시 후 다시 시도하세요."); return; }
             const id = window.currentStudentId;
             const studentIdx = window.classData.findIndex(s => s.id === id);
             
@@ -218,7 +229,7 @@
                 showClassInput();
             } catch (e) { 
                 console.error(e);
-                alert("저장 실패: " + e.message); 
+                alert("저장 실패: " + e.message + "\n(데이터베이스 규칙이 허용되었는지 확인하세요)"); 
             }
         };
 
