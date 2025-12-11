@@ -10,14 +10,26 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        // [핵심 수정] 선생님이 찾아내신 열쇠를 이곳에 심었습니다.
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbb1jaysjUlBjb4wFzoxQK789QQOT79GA",
+            authDomain: "g-mind-78c4a.firebaseapp.com",
+            projectId: "g-mind-78c4a",
+            storageBucket: "g-mind-78c4a.firebasestorage.app",
+            messagingSenderId: "708252783302",
+            appId: "1:708252783302:web:14f5dcca23451d0f7dbdc7",
+            measurementId: "G-RJ16KGZY9N"
+        };
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app';
+        
+        // 데이터가 저장될 폴더 이름 (학교별 구분용, 여기서는 고정)
+        const appId = 'gmind-school-app'; 
         
         window.currentStudentId = null;
         window.classData = []; 
@@ -25,24 +37,22 @@
         window.db = db;
         window.appId = appId;
         window.authReady = false;
-        window.isEditMode = true; // 평가모드 vs 조회모드 구분
+        window.isEditMode = true;
 
+        // 1. 서버 접속 시도 (익명 로그인)
         async function initAuth() {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
+                await signInAnonymously(auth);
             } catch (e) {
                 console.error("Auth Error:", e);
-                updateStatus("서버 연결 실패", "error");
+                updateStatus("서버 설정 확인 필요(콘솔)", "error");
             }
         }
 
+        // 2. 접속 상태 감지
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                updateStatus("🟢 서버 정상 가동 중", "success");
+                updateStatus("🟢 서버 정상 연결됨", "success");
                 window.authReady = true;
                 loadClassList();
             } else {
@@ -81,7 +91,6 @@
             document.getElementById('view-dashboard').style.display = 'block';
         }
 
-        // [모드 분기]
         window.enterInputMode = function() {
             window.isEditMode = true;
             document.getElementById('list-title').innerText = "📝 학생 평가 입력 (수정 가능)";
@@ -121,13 +130,12 @@
             views.forEach(id => document.getElementById(id).style.display = 'none');
         }
 
-        // [학생 선택 핸들러]
         window.selectStudent = async function(id) {
             window.currentStudentId = id;
             const student = window.classData.find(s => s.id === id);
             
-            // 데이터 로드
             let data = {};
+            // 파이어베이스에서 데이터 불러오기
             if (window.authReady) {
                 try {
                     const docRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'gmind_records_v4', id);
@@ -136,7 +144,6 @@
                 } catch (e) { console.error(e); }
             }
 
-            // 모드에 따라 이동
             if (window.isEditMode) {
                 hideAllViews();
                 document.getElementById('view-eval').style.display = 'block';
@@ -148,7 +155,6 @@
             }
         };
 
-        // [평가 뷰 셋업]
         function setupEvalView(student, data) {
             document.getElementById('target-info').innerText = `[${student.dept}] ${student.id} ${student.name}`;
             document.getElementById('inp-dept').value = student.dept;
@@ -167,7 +173,6 @@
                 window.currentScores = parsed.scores || { char: [], pro: [], lang: [] };
                 window.fileData = parsed.files || { job: {}, char: {}, pro: {}, lang: {}, readings: {} };
             } else {
-                // 초기화
                 window.jobDetails = { kor: 5, eng: 5, math: 5, prob: 5, certs: [] };
                 window.charDetails = { mileage: 0, attend: 20, after: 0, readings: [] };
                 window.currentScores = { char: [], pro: [], lang: [] };
@@ -176,9 +181,8 @@
             window.calc();
         }
 
-        // [저장 로직]
         window.saveStudent = async function() {
-            if (!window.authReady) { alert("서버 미연결"); return; }
+            if (!window.authReady) { alert("서버 미연결 상태입니다."); return; }
             const id = window.currentStudentId;
             const studentIdx = window.classData.findIndex(s => s.id === id);
             
@@ -208,10 +212,14 @@
             };
 
             try {
+                // 파이어베이스에 저장
                 await setDoc(doc(window.db, 'artifacts', window.appId, 'public', 'data', 'gmind_records_v4', id), data);
-                alert(`✅ 저장되었습니다.`);
+                alert(`✅ ${window.classData[studentIdx].name} 학생 데이터가 서버에 저장되었습니다.`);
                 showClassInput();
-            } catch (e) { alert("저장 실패"); }
+            } catch (e) { 
+                console.error(e);
+                alert("저장 실패: " + e.message); 
+            }
         };
 
         function updateStatus(msg, type) {
@@ -226,7 +234,7 @@
             --c-job: #3498db; --c-char: #2ecc71; --c-pro: #e67e22; --c-lang: #9b59b6;
         }
         * { box-sizing: border-box; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-body); margin: 0; padding: 0; color: #333; height: 100vh; overflow: hidden; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-body); margin: 0; padding: 0; color: #333; height: 100vh; overflow: hidden; word-break: keep-all; }
         
         .app-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; }
         .view-section { flex: 1; overflow-y: auto; display: none; padding: 20px; animation: fadeIn 0.3s; }
@@ -302,7 +310,6 @@
 
 <div class="app-wrapper">
 
-    <!-- [View 0] 로그인 -->
     <div id="view-login" class="view-section" style="display:flex;">
         <div class="login-box">
             <div style="font-size:3rem; margin-bottom:10px;">💎</div>
@@ -314,7 +321,6 @@
         </div>
     </div>
 
-    <!-- [View 1] 대시보드 -->
     <div id="view-dashboard" class="view-section">
         <div class="dash-header">
             <div>
@@ -348,7 +354,6 @@
         </div>
     </div>
 
-    <!-- [View 2] 학급 목록 (입력/조회 공용) -->
     <div id="view-class" class="view-section">
         <div class="toolbar">
             <h2 id="list-title" style="margin:0; font-family:'Jua';">📝 학급 평가 관리</h2>
@@ -370,7 +375,6 @@
         <div class="student-grid" id="student-grid"></div>
     </div>
 
-    <!-- [View 3] 상세 평가 입력 (Edit Mode) -->
     <div id="view-eval" class="view-section">
         <div class="eval-header">
             <div>
@@ -404,7 +408,6 @@
         </div>
     </div>
 
-    <!-- [View 4] 상세 조회 (Lookup Mode - Checklist) -->
     <div id="view-lookup" class="view-section">
         <div class="lookup-container">
             <div class="lookup-title">
@@ -421,12 +424,10 @@
             </div>
 
             <div id="lookup-content">
-                <!-- 자바스크립트로 체크리스트 생성됨 -->
-            </div>
+                </div>
         </div>
     </div>
 
-    <!-- [View 5] 통계 -->
     <div id="view-stats" class="view-section">
         <div class="toolbar">
             <h2 style="margin:0; font-family:'Jua';">📊 우리 반 통계</h2>
@@ -440,7 +441,6 @@
         </div>
     </div>
 
-    <!-- [View 6] 관리자 모드 -->
     <div id="view-admin" class="view-section">
         <div class="toolbar">
             <h2 style="margin:0; font-family:'Jua';">⚙️ 관리자 설정</h2>
@@ -465,7 +465,6 @@
 
 </div>
 
-<!-- 상세 채점 모달 -->
 <div id="rubric-modal" class="modal-overlay">
     <div class="modal-box">
         <h2 id="modal-title" style="margin:0 0 15px 0; font-family:Jua; border-bottom:2px solid #eee; padding-bottom:10px;">세부 평가</h2>
