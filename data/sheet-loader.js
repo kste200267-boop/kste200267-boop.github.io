@@ -58,7 +58,21 @@ var SheetLoader=(function(){
   // 열 매핑: C~I=월1~7, J~P=화1~7, Q~V=수1~6, W~AB=목1~6, AC~AH=금1~6
   var CLASS_MAP={'용접1':'1용1','용접2':'1용2','기계1':'1기1','기계2':'1기2','금형1':'1금1','금형2':'1금2'};
   var DAY_COLS={월:[2,3,4,5,6,7,8],화:[9,10,11,12,13,14,15],수:[16,17,18,19,20,21],목:[22,23,24,25,26,27],금:[28,29,30,31,32,33]};
+function cleanTeacherSlot(v){
+  v=(v||'').replace(/\n/g,'').trim();
+  if(!v) return null;
 
+  // 정상값만 허용
+  if(/^\d(용|기|금|선|밀)\d$/.test(v)) return v;              // 1용1, 2기2 ...
+  if(/^\d학생선택\(.+\)$/.test(v)) return v;                  // 3학생선택(밀링가공)
+  if(v==='동아리' || v==='자율' || v==='3학선') return v;
+
+  // 쉼표가 들어간 긴 문자열은 깨진 데이터로 간주
+  if(v.indexOf(',')>=0) return null;
+
+  // 그 외는 일단 버림
+  return null;
+}
   function extractClasses(rows){
     var classes={};
     for(var i=4;i<22&&i<rows.length;i++){
