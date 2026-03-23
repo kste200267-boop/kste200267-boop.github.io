@@ -1,84 +1,148 @@
-// pages/weekly.js — 주간 업무 (구글 캘린더 직접)
+// pages/weekly.js — 주간 업무 (구글 캘린더 포털 내 직접)
 var PageWeekly=(function(){
-var CID='243121397435-jlu52hqe8or79msoqj5qkrpuop9o1f0d.apps.googleusercontent.com';
-var SC='https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events';
-var token=null,events=[],weekOff=0,tc=null;
-var DEPTS=[
-{n:'교무부',kw:['교무','시간표','수업','교과','성적'],c:'#0F9D58'},
-{n:'학생부',kw:['생활지도','학생부','선도','출결','학교폭력'],c:'#4285F4'},
-{n:'진로상담부',kw:['진로','상담','진학','대학','입시'],c:'#F4B400'},
-{n:'도제교육부',kw:['도제','현장실습','산학','NCS'],c:'#DB4437'},
-{n:'학년부',kw:['학년','용접','밀링','기계융합','담임'],c:'#AB47BC'},
-{n:'산업취업부',kw:['취업','산업체','채용','면접'],c:'#00ACC1'},
-{n:'인재개발부',kw:['인재','역량','워크숍'],c:'#FF7043'},
-{n:'개인 업무',kw:['개인','연수','출장','휴가'],c:'#607D8B'}];
+  var CLIENT_ID='243121397435-jlu52hqe8or79msoqj5qkrpuop9o1f0d.apps.googleusercontent.com';
+  var SCOPES='https://www.googleapis.com/auth/calendar.readonly';
+  var token=sessionStorage.getItem('gcal-token');
+  var events=[];
+  var weekOff=0;
+  var activeDept='전체';
+  var gisReady=false;
+  var tokenClient=null;
 
-function cls(t){var m=t.match(/\[([^\]]+)\]/);if(m){for(var i=0;i<DEPTS.length;i++){if(DEPTS[i].n===m[1])return DEPTS[i];for(var j=0;j<DEPTS[i].kw.length;j++)if(m[1].indexOf(DEPTS[i].kw[j])>=0)return DEPTS[i]}}
-var tl=t.toLowerCase(),best=null,bs=0;for(var i=0;i<DEPTS.length;i++){if(DEPTS[i].n==='개인 업무')continue;var sc=0;for(var j=0;j<DEPTS[i].kw.length;j++)if(tl.indexOf(DEPTS[i].kw[j])>=0)sc+=DEPTS[i].kw[j].length;if(sc>bs){bs=sc;best=DEPTS[i]}}return best||DEPTS[DEPTS.length-1]}
-function ct(t){return t.replace(/\[[^\]]+\]\s*/,'')}
+  var DEPTS=[
+    {name:'전체',kw:[],color:'#607D8B'},
+    {name:'교무부',kw:['교무','시간표','수업','교과','성적'],color:'#0F9D58'},
+    {name:'학생부',kw:['생활지도','학생부','선도','출결','학교폭력'],color:'#4285F4'},
+    {name:'진로상담부',kw:['진로','상담','진학','대학','입시'],color:'#F4B400'},
+    {name:'도제교육부',kw:['도제','현장실습','산학','NCS'],color:'#DB4437'},
+    {name:'학년부',kw:['학년','용접','밀링','담임','조회'],color:'#AB47BC'},
+    {name:'산업취업부',kw:['취업','산업체','채용','면접'],color:'#00ACC1'},
+    {name:'인재개발부',kw:['인재','역량','워크숍'],color:'#FF7043'},
+    {name:'개인',kw:['개인','연수','출장','휴가'],color:'#78909C'}
+  ];
 
-function initGIS(){
-var s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';
-s.onload=function(){tc=google.accounts.oauth2.initTokenClient({client_id:CID,scope:SC,callback:function(r){if(r.error)return;token=r.access_token;sessionStorage.setItem('gcal-t',token);load()}});
-var sv=sessionStorage.getItem('gcal-t');if(sv){token=sv;load()}};document.head.appendChild(s)}
+  function classify(title){
+    var tag=title.match(/\[([^\]]+)\]/);
+    if(tag){for(var i=1;i<DEPTS.length;i++){if(DEPTS[i].name===tag[1])return DEPTS[i];for(var j=0;j<DEPTS[i].kw.length;j++){if(tag[1].indexOf(DEPTS[i].kw[j])>=0)return DEPTS[i]}}}
+    var tl=title.toLowerCase();for(var i=1;i<DEPTS.length;i++){for(var j=0;j<DEPTS[i].kw.length;j++){if(tl.indexOf(DEPTS[i].kw[j])>=0)return DEPTS[i]}}
+    return DEPTS[DEPTS.length-1];
+  }
 
-function load(){
-var mon=Store.getMonday(new Date());mon.setDate(mon.getDate()+weekOff*7);
-var sun=new Date(mon);sun.setDate(mon.getDate()+6);sun.setHours(23,59,59);
-var url='https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin='+mon.toISOString()+'&timeMax='+sun.toISOString()+'&singleEvents=true&orderBy=startTime&maxResults=200';
-var x=new XMLHttpRequest();x.open('GET',url);x.setRequestHeader('Authorization','Bearer '+token);
-x.onload=function(){if(x.status===401){token=null;sessionStorage.removeItem('gcal-t');rLogin();return}
-var d=JSON.parse(x.responseText);events=(d.items||[]).map(function(e){var dp=cls(e.summary||'');var ia=!!(e.start&&e.start.date);
-return{id:e.id,title:e.summary||'',start:ia?e.start.date+'T00:00:00':e.start.dateTime,end:ia?(e.end?e.end.date+'T23:59:59':e.start.date+'T23:59:59'):(e.end?e.end.dateTime:e.start.dateTime),ia:ia,dn:dp.n,dc:dp.c,loc:e.location||''}});rWeek()};
-x.onerror=function(){toast('네트워크 오류')};x.send()}
+  function pad(n){return String(n).padStart(2,'0')}
+  function fmtTime(s){var d=new Date(s);return pad(d.getHours())+':'+pad(d.getMinutes())}
+  function cleanTitle(t){return t.replace(/\[[^\]]+\]\s*/,'')}
 
-function rLogin(){
-var h='<div class="card"><div class="card-h">📋 주간 업무</div><div style="text-align:center;padding:30px 0">';
-h+='<p style="color:var(--tx2);font-size:.9em;margin-bottom:16px">Google 캘린더 로그인으로 부서별 주간 업무를 확인하세요</p>';
-h+='<button class="a-btn primary" style="padding:12px 28px;font-size:.95em" onclick="PageWeekly.login()">📅 Google 캘린더 로그인</button></div></div>';
-document.getElementById('pg').innerHTML=h}
+  function getRange(){
+    var d=new Date();d.setDate(d.getDate()+weekOff*7);
+    var mon=Store.getMonday(d);var sun=new Date(mon);sun.setDate(mon.getDate()+6);sun.setHours(23,59,59);
+    return{start:mon,end:sun};
+  }
 
-function rWeek(){
-var mon=Store.getMonday(new Date());mon.setDate(mon.getDate()+weekOff*7);
-var dates=[];for(var i=0;i<7;i++){var dd=new Date(mon);dd.setDate(mon.getDate()+i);dates.push(dd)}
-var lb=(dates[0].getMonth()+1)+'/'+dates[0].getDate()+' ~ '+(dates[6].getMonth()+1)+'/'+dates[6].getDate();
-var dn=['월','화','수','목','금','토','일'],ts=new Date().toDateString();
+  function render(){
+    var range=getRange();
+    var label=(range.start.getMonth()+1)+'/'+range.start.getDate()+' ~ '+(range.end.getMonth()+1)+'/'+range.end.getDate();
 
-var h='<div class="card"><div class="card-h">📋 주간 업무<span class="right"><button class="a-btn outline sm" onclick="PageWeekly.lo()">로그아웃</button></span></div>';
-h+='<div class="week-nav"><button onclick="PageWeekly.p()">◀</button><span class="wk-label">'+lb+'</span><button onclick="PageWeekly.n()">▶</button><button onclick="PageWeekly.t()" style="margin-left:4px">이번주</button></div>';
-h+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">';
-for(var i=0;i<DEPTS.length;i++)h+='<span style="font-size:.7em;padding:2px 7px;border-radius:10px;background:'+DEPTS[i].c+';color:#fff">'+DEPTS[i].n+'</span>';
-h+='</div>';
+    var h='<div class="card"><div class="card-h">📋 주간 업무</div>';
+    h+='<div class="week-nav"><button onclick="PageWeekly.prev()">◀</button><span class="wk-label">'+label+'</span><button onclick="PageWeekly.next()">▶</button><button onclick="PageWeekly.now()" style="margin-left:4px">이번주</button></div>';
 
-// 주간 그리드
-h+='<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--bd);border-radius:var(--radius-sm);overflow:hidden">';
-for(var i=0;i<7;i++){var dd=dates[i],iT=dd.toDateString()===ts,iW=i>=5;
-h+='<div style="border-right:'+(i<6?'1px solid var(--bd)':'none')+';min-height:120px;display:flex;flex-direction:column">';
-h+='<div style="text-align:center;padding:6px 2px;border-bottom:1px solid var(--bd);background:'+(iT?'var(--blue)':iW?'var(--bg3)':'var(--bg2)')+'"><div style="font-size:.7em;color:'+(iT?'#fff':iW?'var(--red)':'var(--tx2)')+'">'+dn[i]+'</div><div style="font-size:.85em;font-weight:600;color:'+(iT?'#fff':'var(--tx)')+'">'+dd.getDate()+'</div></div>';
-h+='<div style="padding:3px;flex:1;background:var(--bg)">';
-var dS=new Date(dd);dS.setHours(0,0,0,0);var dE=new Date(dd);dE.setHours(23,59,59);
-var de=events.filter(function(e){return new Date(e.start)<=dE&&new Date(e.end)>=dS});
-de.sort(function(a,b){if(a.ia&&!b.ia)return-1;if(!a.ia&&b.ia)return 1;return new Date(a.start)-new Date(b.start)});
-if(!de.length)h+='<div style="font-size:.68em;color:var(--tx3);text-align:center;padding:10px 0">—</div>';
-for(var j=0;j<de.length;j++){var e=de[j],tm='';
-if(!e.ia){var st=new Date(e.start);tm=String(st.getHours()).padStart(2,'0')+':'+String(st.getMinutes()).padStart(2,'0')}
-h+='<div style="padding:2px 4px;margin-bottom:2px;border-radius:3px;border-left:3px solid '+e.dc+';font-size:.68em" title="'+e.title+(e.loc?' — '+e.loc:'')+'">';
-if(tm)h+='<span style="color:var(--tx3)">'+tm+' </span>';
-h+='<span style="font-weight:500">'+ct(e.title)+'</span></div>'}
-h+='</div></div>'}h+='</div>';
+    if(!token){
+      h+='<div style="text-align:center;padding:30px 0">';
+      h+='<p style="color:var(--tx2);margin-bottom:14px">Google 캘린더에 로그인하여 주간 업무를 확인하세요</p>';
+      h+='<button class="a-btn primary" style="padding:12px 28px;font-size:.95em" onclick="PageWeekly.gLogin()">📅 Google 계정으로 로그인</button>';
+      h+='<div style="margin-top:12px"><button class="a-btn outline" onclick="PageWeekly.loadDemo()">🎭 데모 데이터로 보기</button></div>';
+      h+='</div>';
+    } else {
+      h+='<div class="chips" style="margin-bottom:8px">';
+      for(var i=0;i<DEPTS.length;i++){var dp=DEPTS[i];var on=activeDept===dp.name;
+        h+='<span class="chip'+(on?' on':'')+'" style="'+(on?'background:'+dp.color+';border-color:'+dp.color:'border-color:'+dp.color+';color:'+dp.color)+'" onclick="PageWeekly.setDept(\''+dp.name+'\')">'+dp.name+'</span>';
+      }
+      h+='</div>';
+      h+='<div id="weekGrid">🔄 불러오는 중...</div>';
+    }
+    h+='</div>';
+    document.getElementById('pg').innerHTML=h;
+    if(token) loadEvents();
+  }
 
-// 부서별 요약
-h+='<div style="margin-top:12px"><div style="font-weight:600;font-size:.88em;margin-bottom:6px">부서별 ('+events.length+'건)</div>';
-var bd={};for(var i=0;i<events.length;i++){var e=events[i];if(!bd[e.dn])bd[e.dn]=[];bd[e.dn].push(e)}
-for(var i=0;i<DEPTS.length;i++){var d=DEPTS[i];if(!bd[d.n])continue;
-h+='<div style="margin-bottom:6px"><span style="font-size:.78em;padding:1px 7px;border-radius:8px;background:'+d.c+';color:#fff;font-weight:600">'+d.n+' ('+bd[d.n].length+')</span><div style="margin-top:2px">';
-for(var j=0;j<bd[d.n].length;j++){var e=bd[d.n][j];var ds=new Date(e.start);
-h+='<div style="font-size:.8em;padding:1px 0"><span style="color:var(--tx3)">'+(ds.getMonth()+1)+'/'+ds.getDate()+'</span> '+ct(e.title)+'</div>'}
-h+='</div></div>'}h+='</div></div>';
-document.getElementById('pg').innerHTML=h}
+  function loadEvents(){
+    if(token==='demo'){renderGrid();return}
+    var range=getRange();
+    var url='https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin='+range.start.toISOString()+'&timeMax='+range.end.toISOString()+'&singleEvents=true&orderBy=startTime&maxResults=200';
+    fetch(url,{headers:{'Authorization':'Bearer '+token}})
+    .then(function(r){if(r.status===401){token=null;sessionStorage.removeItem('gcal-token');render();return null}return r.json()})
+    .then(function(data){
+      if(!data||data.error)return;
+      events=(data.items||[]).map(function(ev){
+        var isAll=!!(ev.start&&ev.start.date);var dept=classify(ev.summary||'');
+        return{title:ev.summary||'',start:isAll?ev.start.date+'T00:00:00':ev.start.dateTime,end:isAll?(ev.end?ev.end.date+'T23:59:59':ev.start.date+'T23:59:59'):(ev.end?ev.end.dateTime:ev.start.dateTime),isAll:isAll,dept:dept.name,color:dept.color,location:ev.location||''};
+      });
+      renderGrid();
+    }).catch(function(){
+      var el=document.getElementById('weekGrid');
+      if(el)el.innerHTML='<div style="color:var(--red);padding:12px">캘린더 로드 실패. 네트워크를 확인하세요.</div>';
+    });
+  }
 
-function render(){if(!tc&&typeof google==='undefined')initGIS();else if(token)load();else{var sv=sessionStorage.getItem('gcal-t');if(sv){token=sv;load()}else rLogin()}}
-return{render:render,login:function(){if(tc)tc.requestAccessToken();else{initGIS();setTimeout(function(){if(tc)tc.requestAccessToken()},1500)}},
-lo:function(){token=null;sessionStorage.removeItem('gcal-t');rLogin()},
-p:function(){weekOff--;load()},n:function(){weekOff++;load()},t:function(){weekOff=0;load()}};
+  function renderGrid(){
+    var range=getRange();var dn=['월','화','수','목','금','토','일'];
+    var filtered=activeDept==='전체'?events:events.filter(function(e){return e.dept===activeDept});
+    var dayEvs={};for(var i=0;i<7;i++)dayEvs[i]=[];
+    for(var i=0;i<filtered.length;i++){var ev=filtered[i];var sd=new Date(ev.start);var idx=Math.floor((sd-range.start)/864e5);if(idx<0)idx=0;if(idx>6)idx=6;dayEvs[idx].push(ev)}
+    var today=new Date().toDateString();
+    var h='<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--bd);border-radius:var(--radius-sm);overflow:hidden">';
+    for(var i=0;i<7;i++){
+      var dd=new Date(range.start);dd.setDate(range.start.getDate()+i);var isT=dd.toDateString()===today;
+      h+='<div style="border-right:'+(i<6?'1px solid var(--bd)':'none')+';min-height:160px">';
+      h+='<div style="text-align:center;padding:6px;background:'+(isT?'var(--blue)':'var(--bg2)')+';border-bottom:1px solid var(--bd);color:'+(isT?'#fff':'var(--tx)')+'">';
+      h+='<div style="font-size:.75em;font-weight:500">'+dn[i]+'</div><div style="font-size:.95em;font-weight:700">'+(dd.getMonth()+1)+'/'+dd.getDate()+'</div></div>';
+      h+='<div style="padding:3px">';
+      var evs=dayEvs[i];
+      if(!evs.length)h+='<div style="color:var(--tx3);font-size:.72em;text-align:center;padding:12px 0">일정 없음</div>';
+      for(var j=0;j<evs.length;j++){var ev=evs[j];
+        h+='<div style="padding:4px 5px;margin-bottom:3px;border-left:3px solid '+ev.color+';border-radius:0 3px 3px 0;background:var(--bg);font-size:.75em" title="'+ev.title+'">';
+        if(!ev.isAll)h+='<div style="color:var(--tx3);font-size:.9em">'+fmtTime(ev.start)+'</div>';
+        h+='<div style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+cleanTitle(ev.title)+'</div>';
+        if(ev.location)h+='<div style="color:var(--tx3);font-size:.85em">📍'+ev.location+'</div>';
+        h+='</div>';
+      }
+      h+='</div></div>';
+    }
+    h+='</div><div style="margin-top:6px;font-size:.78em;color:var(--tx3)">총 '+filtered.length+'건'+(token==='demo'?' · 🎭 데모 모드':'')+'</div>';
+    var el=document.getElementById('weekGrid');
+    if(el)el.innerHTML=h;
+  }
+
+  function gLogin(){
+    if(typeof google!=='undefined'&&google.accounts){doAuth();return}
+    var sc=document.createElement('script');sc.src='https://accounts.google.com/gsi/client';
+    sc.onload=function(){doAuth()};document.head.appendChild(sc);
+  }
+
+  function doAuth(){
+    tokenClient=google.accounts.oauth2.initTokenClient({
+      client_id:CLIENT_ID,scope:SCOPES,
+      callback:function(resp){if(resp.error)return;token=resp.access_token;sessionStorage.setItem('gcal-token',token);render()}
+    });
+    tokenClient.requestAccessToken();
+  }
+
+  function loadDemo(){
+    var mon=Store.getMonday(new Date());
+    var items=[
+      ['[교무부] 중간고사 출제 범위 협의','교무부','#0F9D58','본동 세미나실',0,14,16],
+      ['[학생부] 학교폭력 예방교육 전체','학생부','#4285F4','강당',0,9,11],
+      ['[진로상담부] 3학년 진학 상담','진로상담부','#F4B400','',1,9,12],
+      ['[도제교육부] 산학 기업 방문','도제교육부','#DB4437','',1,13,17],
+      ['[학년부] 1학년 담임 협의회','학년부','#AB47BC','세미나실',2,10,11],
+      ['[산업취업부] 채용 박람회 준비','산업취업부','#00ACC1','계정아트홀',2,14,16],
+      ['[인재개발부] 교원 역량 연수','인재개발부','#FF7043','본동 세미나실',3,9,12],
+      ['[개인] 통합사회 수업 준비','개인','#78909C','',3,16,17],
+      ['[학생부] 기숙사 점검','학생부','#4285F4','기숙사',4,9,10],
+      ['[교무부] 수업 공개의 날','교무부','#0F9D58','',4,10,12]
+    ];
+    events=items.map(function(t,i){var d=new Date(mon);d.setDate(mon.getDate()+t[4]);var s=new Date(d);s.setHours(t[5],0);var e=new Date(d);e.setHours(t[6],0);return{title:t[0],start:s.toISOString(),end:e.toISOString(),isAll:false,dept:t[1],color:t[2],location:t[3]}});
+    token='demo';render();
+  }
+
+  return{render:render,prev:function(){weekOff--;if(token)loadEvents();else render()},next:function(){weekOff++;if(token)loadEvents();else render()},now:function(){weekOff=0;if(token)loadEvents();else render()},setDept:function(d){activeDept=d;renderGrid()},gLogin:gLogin,loadDemo:loadDemo};
 })();
