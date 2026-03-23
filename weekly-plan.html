@@ -866,11 +866,54 @@ document.addEventListener('click', function(e) {
 });
 
 // ═══════════════════════════════════════════════════════════
+// FIREBASE SYNC (부서/장소를 서버에 저장)
+// ═══════════════════════════════════════════════════════════
+var _wkDb=null;
+function initWeeklyFirebase(){
+  try{
+    if(typeof firebase==='undefined')return;
+    var cfg={apiKey:"AIzaSyAIL9zYAkt_VKPck7FaMuHTFc6ALMeIp7k",authDomain:"gbgigo-portal.firebaseapp.com",projectId:"gbgigo-portal",storageBucket:"gbgigo-portal.firebasestorage.app",messagingSenderId:"276912850692",appId:"1:276912850692:web:7567b8af1cee85e2c9f251"};
+    if(!firebase.apps.length)firebase.initializeApp(cfg);
+    _wkDb=firebase.firestore();
+    // Firebase에서 부서/장소 로드
+    _wkDb.collection('portal').doc('weekly-depts').get().then(function(doc){
+      if(doc.exists&&doc.data().value){
+        state.departments=doc.data().value;
+        localStorage.setItem('departments',JSON.stringify(state.departments));
+        if(!state.activeDepts)state.activeDepts=state.departments.map(function(d){return d.name});
+        if(state.loggedIn)render();
+      }
+    }).catch(function(){});
+    _wkDb.collection('portal').doc('weekly-locs').get().then(function(doc){
+      if(doc.exists&&doc.data().value){
+        state.locations=doc.data().value;
+        localStorage.setItem('locations',JSON.stringify(state.locations));
+      }
+    }).catch(function(){});
+  }catch(e){console.error('Weekly Firebase init error:',e)}
+}
+
+// saveDepts/saveLocs 오버라이드
+var _origSaveDepts=saveDepts;
+saveDepts=function(){
+  _origSaveDepts();
+  if(_wkDb)_wkDb.collection('portal').doc('weekly-depts').set({value:state.departments,updated:new Date().toISOString()}).catch(function(){});
+};
+var _origSaveLocs=saveLocs;
+saveLocs=function(){
+  _origSaveLocs();
+  if(_wkDb)_wkDb.collection('portal').doc('weekly-locs').set({value:state.locations,updated:new Date().toISOString()}).catch(function(){});
+};
+
+// ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
 render(); // 초기 렌더 (로딩)
 </script>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>initWeeklyFirebase();</script>
 <script src="https://accounts.google.com/gsi/client" onload="initGIS()" async defer></script>
 
 </body>

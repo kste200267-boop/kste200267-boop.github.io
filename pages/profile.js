@@ -50,9 +50,10 @@ var PageProfile=(function(){
 
     // ── 내 시간표 직접 편집 ──
     h+='<div class="card"><div class="card-h">📅 내 시간표 편집</div>';
-    h+='<p style="color:var(--tx2);font-size:.82em;margin-bottom:8px">각 칸에 수업 반을 입력하세요. (예: 1용1, 2기2) 빈칸 = 빈 시간</p>';
+    h+='<p style="color:var(--tx2);font-size:.82em;margin-bottom:8px">각 칸의 <b>반</b>(위)과 <b>과목</b>(아래)을 입력하세요.</p>';
     var t=TD_A[U]||TD_B[U];
     if(!t){t={h:0,s:new Array(32).fill(null)};TD_A[U]=t;TD_B[U]={h:0,s:new Array(32).fill(null)}}
+    var mySubjs=Store.get('tt-subj-'+U,{});
     if(t){
       h+='<div style="overflow-x:auto"><table class="a-table" style="font-size:.82em"><thead><tr><th></th>';
       for(var di=0;di<5;di++)h+='<th>'+DAYS[di]+'</th>';
@@ -63,9 +64,11 @@ var PageProfile=(function(){
           if(p>=DP[d]){h+='<td style="background:var(--bg3)">—</td>';continue}
           var si=Engine.si(d,p);
           var val=t.s[si]||'';
-          var subj='';if(val&&CS[val]&&CS[val][d])subj=CS[val][d][p]||'';
-          h+='<td style="padding:2px"><input class="ti-input" style="padding:3px 5px;font-size:.82em;text-align:center'+(val?';background:#e8f0fe':'')+'" value="'+val+'" data-si="'+si+'" placeholder="—">';
-          if(subj)h+='<div style="font-size:.68em;color:var(--tx3);text-align:center">'+subj+'</div>';
+          var autoSubj='';if(val&&CS[val]&&CS[val][d])autoSubj=CS[val][d][p]||'';
+          var custSubj=mySubjs[String(si)]||'';
+          h+='<td style="padding:2px">';
+          h+='<input class="ti-input" style="padding:2px 4px;font-size:.82em;text-align:center;margin-bottom:1px'+(val?';background:#e8f0fe':'')+'" value="'+val+'" data-si="'+si+'" data-type="cls" placeholder="반">';
+          h+='<input class="ti-input" style="padding:2px 4px;font-size:.75em;text-align:center;color:var(--blue)" value="'+(custSubj||autoSubj)+'" data-si="'+si+'" data-type="subj" placeholder="과목">';
           h+='</td>';
         }
         h+='</tr>';
@@ -140,23 +143,34 @@ var PageProfile=(function(){
     toast('저장됨');render();
   }
 
-  // 시간표 저장
+  // 시간표 저장 (반 + 과목)
   function saveTT(){
     var U=App.getUser();
-    var inputs=document.querySelectorAll('[data-si]');
     if(!TD_A[U])return;
-    for(var i=0;i<inputs.length;i++){
-      var si=parseInt(inputs[i].dataset.si);
-      var val=inputs[i].value.trim();
+    var clsInputs=document.querySelectorAll('[data-si][data-type="cls"]');
+    var subjInputs=document.querySelectorAll('[data-si][data-type="subj"]');
+    // 반 저장
+    for(var i=0;i<clsInputs.length;i++){
+      var si=parseInt(clsInputs[i].dataset.si);
+      var val=clsInputs[i].value.trim();
       TD_A[U].s[si]=val||null;
     }
+    // 과목 저장
+    var mySubjs={};
+    for(var i=0;i<subjInputs.length;i++){
+      var si=subjInputs[i].dataset.si;
+      var val=subjInputs[i].value.trim();
+      if(val)mySubjs[si]=val;
+    }
+    Store.set('tt-subj-'+U,mySubjs);
+    // 시수 계산
     var cnt=0;for(var j=0;j<TD_A[U].s.length;j++){if(TD_A[U].s[j])cnt++}
     TD_A[U].h=cnt;
     Store.set('td-custom-'+U,{h:cnt,s:TD_A[U].s});
-    Store.set('myedit-'+U,{}); // 개인 수정사항 초기화
+    Store.set('myedit-'+U,{});
     Engine.rebuild();
     document.getElementById('tSub').textContent=Engine.TS()[U]+' · '+cnt+'시수';
-    toast('시간표 저장됨 ('+cnt+'시수)');
+    toast('시간표+과목 저장됨 ('+cnt+'시수)');
     render();
   }
 

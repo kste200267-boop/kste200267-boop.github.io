@@ -45,7 +45,7 @@ var PageMy=(function(){
         var isN=wkOff===0&&d===today&&p===np,isS=Engine.isSwapped(U,d,p,w.key);
         var isE=edits.hasOwnProperty(String(si));
         var cls=isN?'now-c':cl?(isS||isE?'swapped':'my'):'emp';
-        var sj='';if(cl&&CS[cl])sj=CS[cl][d][p]||'';else if(cl)sj=cl;
+        var sj='';var _mySj=Store.get('tt-subj-'+U,{});var _siKey=String(Engine.si(d,p));if(_mySj[_siKey])sj=_mySj[_siKey];else if(cl&&CS[cl])sj=CS[cl][d][p]||'';else if(cl)sj=cl;
         if(editMode){
           h+='<td class="'+cls+'" style="cursor:pointer" onclick="PageMy.editCell('+si+',\''+d+'\','+(p+1)+')">'+(cl||'<span style="color:var(--tx3)">—</span>')+'</td>';
         }else{

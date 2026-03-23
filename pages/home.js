@@ -30,7 +30,7 @@ var PageHome=(function(){
       h+='</tr></thead><tbody><tr>';
       for(var p=0;p<DP[today];p++){
         var cl=Engine.slot(U,today,p),cls=p===np?'now-c':cl?'my':'emp',sj='';
-        if(cl&&CS[cl])sj=CS[cl][today][p]||'';else if(cl)sj=cl;
+        var _hSj=Store.get('tt-subj-'+U,{});if(cl&&CS[cl])sj=CS[cl][today][p]||'';else if(cl)sj=cl;var _hk=String(Engine.si(today,p));if(_hSj[_hk])sj=_hSj[_hk];
         h+='<td class="'+cls+'">'+(cl?(cl.replace(/^\d/,'')+'<br><span style="font-size:.78em">'+sj+'</span>'):'—')+'</td>';
       }
       h+='</tr></tbody></table>';
