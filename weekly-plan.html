@@ -648,30 +648,79 @@ function renderEventEl(ev, compact) {
 function renderWeekGrid() {
   var wrap = h('div', {className:'week-grid'});
   var mon = getMonday(state.baseDate);
-  var filtered = getSorted(getFiltered());
-  var byDay = Array.from({length:7}, function(){return[]});
-  filtered.forEach(function(ev){var d=dayIdx(ev.start);if(d>=0&&d<7)byDay[d].push(ev)});
+  var sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  sun.setHours(23,59,59,999);
 
-  for (var i=0;i<7;i++) {
-    var d = new Date(mon); d.setDate(mon.getDate()+i);
-    var td = isToday(d), we = i>=5;
+  var screenW = window.innerWidth || document.documentElement.clientWidth || 1200;
+  var compact = screenW < 900;
+  var mobile = screenW < 640;
+
+  var filtered = getSorted(getFiltered()).filter(function(ev){
+    var st = new Date(ev.start);
+    return st >= mon && st <= sun;
+  });
+
+  var byDay = Array.from({length:7}, function(){ return []; });
+  filtered.forEach(function(ev){
+    var d = dayIdx(ev.start);
+    if (d >= 0 && d < 7) byDay[d].push(ev);
+  });
+
+  for (var i=0; i<7; i++) {
+    var d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+
+    var td = isToday(d);
+    var we = i >= 5;
+
     var col = h('div', {className:'day-col'});
     var head = h('div', {className:'day-head'+(td?' today':'')+(we?' weekend':'')});
+
     head.appendChild(h('div', {className:'day-name'}, DAY_NAMES[i]));
     head.appendChild(h('div', {className:'day-num'}, String(d.getDate())));
     col.appendChild(head);
+
     var body = h('div', {className:'day-body'});
+
     if (byDay[i].length === 0) {
       body.appendChild(h('div', {className:'empty'}, '-'));
     } else {
-      byDay[i].forEach(function(ev){body.appendChild(renderEventEl(ev, true))});
+      var dayEvents = byDay[i];
+
+      // 화면이 좁으면 시간순 우선이 더 보기 편함
+      if (compact) {
+        dayEvents = dayEvents.slice().sort(function(a,b){
+          return new Date(a.start) - new Date(b.start);
+        });
+      }
+
+      // 모바일에서는 너무 많으면 일부만 보이고 나머지 건수 표시
+      var limit = mobile ? 4 : compact ? 6 : 999;
+      for (var j = 0; j < Math.min(dayEvents.length, limit); j++) {
+        body.appendChild(renderEventEl(dayEvents[j], compact));
+      }
+
+      if (dayEvents.length > limit) {
+        body.appendChild(
+          h('div', {
+            style:{
+              fontSize:'10px',
+              color:'var(--tx3)',
+              textAlign:'center',
+              padding:'6px 0'
+            }
+          }, '+' + (dayEvents.length - limit) + '개 더')
+        );
+      }
     }
+
     col.appendChild(body);
     wrap.appendChild(col);
   }
+
   return wrap;
 }
-
 function renderMonthGrid() {
   var wrap = h('div', {className:'month-grid'});
   var header = h('div', {className:'month-header'});
