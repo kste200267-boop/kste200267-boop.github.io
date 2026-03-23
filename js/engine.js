@@ -85,6 +85,20 @@ var Engine=(function(){
     nowP:function(){var n=new Date(),t=n.getHours()*60+n.getMinutes();for(var i=0;i<PT.length;i++){var a=PT[i].s.split(':'),b=PT[i].e.split(':');if(t>=a[0]*60+ +a[1]&&t<=b[0]*60+ +b[1])return i}return-1},
     names:function(){return Object.keys(TD).sort()},
     go1:function(){var r=[];for(var t in TD){var s=TD[t].s;for(var i=0;i<s.length;i++){if(s[i]&&s[i].charAt(0)==='1'){r.push(t);break}}}return r.sort()},
-    allCls:function(){var a={};for(var t in TD){var s=TD[t].s;for(var i=0;i<s.length;i++){if(s[i]&&s[i]!=='동아리'&&s[i]!=='3학선')a[s[i]]=1}}return Object.keys(a).sort()}
+allCls:function(){
+  var a={};
+  for(var t in TD){
+    var s=TD[t].s;
+    for(var i=0;i<s.length;i++){
+      var v=s[i];
+      if(!v) continue;
+      if(v==='동아리' || v==='3학선' || v==='자율') continue;
+      if(/^\d(용|기|금|선|밀)\d$/.test(v) || /^\d학생선택\(.+\)$/.test(v)){
+        a[v]=1;
+      }
+    }
+  }
+  return Object.keys(a).sort();
+}
   };
 })();
