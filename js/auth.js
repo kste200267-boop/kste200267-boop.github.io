@@ -10,31 +10,44 @@ var Auth=(function(){
   function getAccounts(){return Store.get('accounts',{})}
   function saveAccounts(a){Store.set('accounts',a)}
 
-  function login(){
-    var id=document.getElementById('loginId').value.trim();
-    var pw=document.getElementById('loginPw').value;
-    var err=document.getElementById('loginErr');
-    if(!id||!pw){err.textContent='아이디와 비밀번호를 입력하세요';return}
-    var acc=getAccounts(),found=null;
-    for(var k in acc){if(acc[k].id===id){found=acc[k];found._key=k;break}}
-    if(!found){err.textContent='존재하지 않는 아이디입니다';return}
-    if(found.pw!==pw){err.textContent='비밀번호가 틀렸습니다';return}
-    err.textContent='';
-    Store.set('session',{name:found._key,role:found.role});
-    showApp(found._key,found.role==='admin');
+function login(){
+  var id=document.getElementById('loginId').value.trim();
+  var pw=document.getElementById('loginPw').value;
+  var err=document.getElementById('loginErr');
+  if(!id||!pw){err.textContent='아이디와 비밀번호를 입력하세요';return}
+  var acc=getAccounts(),found=null;
+  for(var k in acc){if(acc[k].id===id){found=acc[k];found._key=k;break}}
+  if(!found){err.textContent='존재하지 않는 아이디입니다';return}
+  if(found.pw!==pw){err.textContent='비밀번호가 틀렸습니다';return}
+  err.textContent='';
+
+  // 로그인 세션은 내 브라우저에만 저장
+  sessionStorage.setItem('gm-session', JSON.stringify({
+    name: found._key,
+    role: found.role
+  }));
+
+  showApp(found._key,found.role==='admin');
+}
+
+function logout(){
+  sessionStorage.removeItem('gm-session');
+  document.getElementById('shell').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginId').value='';
+  document.getElementById('loginPw').value='';
+  document.getElementById('loginErr').textContent='';
+}
+
+function tryAutoLogin(){
+  var raw=sessionStorage.getItem('gm-session');
+  var sess=raw?JSON.parse(raw):null;
+  if(sess&&(TD_A[sess.name]||Store.get('td-custom-'+sess.name))){
+    showApp(sess.name,sess.role==='admin');
+    return true;
   }
-  function logout(){
-    Store.remove('session');
-    document.getElementById('shell').style.display='none';
-    document.getElementById('loginScreen').style.display='flex';
-    document.getElementById('loginId').value='';document.getElementById('loginPw').value='';
-    document.getElementById('loginErr').textContent='';
-  }
-  function tryAutoLogin(){
-    var sess=Store.get('session',null);
-    if(sess&&(TD_A[sess.name]||Store.get('td-custom-'+sess.name))){showApp(sess.name,sess.role==='admin');return true}
-    return false;
-  }
+  return false;
+}
   function showApp(name,isAdmin){
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('shell').style.display='flex';
