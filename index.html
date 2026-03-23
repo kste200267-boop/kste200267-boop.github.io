@@ -76,8 +76,16 @@
   var savedPT = Store.get('pt');
   if (savedPT) PT = savedPT;
 
+  // 커스텀 시간표 로드
+  var customTD = Store.get('td-custom');
+  if (customTD) { for (var k in customTD) TD_ORIGINAL[k] = customTD[k]; }
+
   // 첫 실행: 기본 계정 생성
   Auth.initAccounts();
+
+  // 과목 오버라이드 적용
+  Engine.rebuild();
+  if (typeof PageAdmin !== 'undefined' && PageAdmin.initOverrides) PageAdmin.initOverrides();
 
   // 자동 로그인 시도
   if (!Auth.tryAutoLogin()) {
