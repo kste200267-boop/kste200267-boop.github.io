@@ -52,8 +52,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <!-- 데이터 -->
-<script src="data/teachers.js"></script>
-<script src="data/classes.js"></script>
+<script src="data/constants.js"></script>
+<script src="data/sheet-loader.js"></script>
 <!-- 코어 -->
 <script src="js/store.js"></script>
 <script src="js/toast.js"></script>
@@ -79,21 +79,38 @@
   // 1. Firebase 초기화
   initFirebase();
 
-  // 2. Firebase에서 데이터 동기화 후 앱 시작
-  Store.syncFromFirebase(function() {
-    // 저장된 교시 시간 로드
+  // 2. 캐시에서 빠른 로드 (즉시 화면 표시용)
+  var hasCache = SheetLoader.loadFromCache();
+
+  function startApp() {
     var savedPT = Store.get('pt');
     if (savedPT) PT = savedPT;
-
-    // 첫 실행: 기본 계정 생성
     Auth.initAccounts();
-
-    // 엔진 빌드 (A/B주 자동 판별, 커스텀/오버라이드 모두 반영)
     Engine.rebuild();
-
-    // 자동 로그인 시도
     if (!Auth.tryAutoLogin()) {
       document.getElementById('loginScreen').style.display = 'flex';
+    }
+  }
+
+  // 3. Firebase 동기화
+  Store.syncFromFirebase(function() {
+    if (hasCache) {
+      // 캐시 있으면 바로 앱 시작, 백그라운드에서 시트 갱신
+      startApp();
+      SheetLoader.loadAll(function() {
+        Engine.rebuild(); // 시트 데이터로 조용히 갱신
+      });
+    } else {
+      // 캐시 없으면 시트 로드 후 시작
+      document.getElementById('loginScreen').innerHTML = '<div class="login-box"><div class="login-title">🏫 경북기계금속고</div><div class="login-sub">시간표 불러오는 중...</div></div>';
+      document.getElementById('loginScreen').style.display = 'flex';
+      SheetLoader.loadAll(function(err) {
+        if (err && !Object.keys(TD_A).length) {
+          document.getElementById('loginScreen').innerHTML = '<div class="login-box"><div class="login-title">⚠️ 오류</div><div class="login-sub">시간표를 불러올 수 없습니다.<br>네트워크를 확인하세요.</div><button class="btn-login" onclick="location.reload()">다시 시도</button></div>';
+          return;
+        }
+        startApp();
+      });
     }
   });
 })();
