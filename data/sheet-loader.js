@@ -73,14 +73,28 @@ function cleanTeacherSlot(v){
   // 그 외는 일단 버림
   return null;
 }
-  function extractClasses(rows){
+ function extractClasses(rows){
   var classes={};
+  var teacherStart = rows.length;
 
+  // "교사" 헤더 위치 찾기
   for(var i=0;i<rows.length;i++){
+    var joined = rows[i].join(' ').replace(/\n/g,'').replace(/\s+/g,'');
+    if(joined.indexOf('교사') >= 0){
+      teacherStart = i;
+      break;
+    }
+  }
+
+  // 교사 섹션 전까지만 반 시간표 추출
+  for(var i=0;i<teacherStart;i++){
     var row=rows[i];
     var className=(row[1]||'').replace(/\n/g,'').trim();
     var mapped=CLASS_MAP[className];
     if(!mapped) continue;
+
+    // 이미 읽은 반이면 덮어쓰지 않음
+    if(classes[mapped]) continue;
 
     var cls={};
     for(var day in DAY_COLS){
@@ -94,6 +108,7 @@ function cleanTeacherSlot(v){
       }
       cls[day]=periods;
     }
+
     classes[mapped]=cls;
   }
 
