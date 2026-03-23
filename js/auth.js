@@ -40,5 +40,17 @@ var Auth=(function(){
     document.getElementById('shell').style.display='flex';
     App.init(name,isAdmin);
   }
-  return{initAccounts:initAccounts,getAccounts:getAccounts,saveAccounts:saveAccounts,login:login,logout:logout,tryAutoLogin:tryAutoLogin};
-})();
+  return{initAccounts:initAccounts,getAccounts:getAccounts,saveAccounts:saveAccounts,login:login,logout:logout,tryAutoLogin:tryAutoLogin,
+    changePw:function(){
+      var user=App.getUser();if(!user)return;
+      var acc=getAccounts();if(!acc[user])return;
+      var cur=prompt('현재 비밀번호:');
+      if(cur===null)return;
+      if(cur!==acc[user].pw){toast('현재 비밀번호가 틀립니다');return}
+      var np=prompt('새 비밀번호:');
+      if(!np||np.length<1){toast('비밀번호를 입력하세요');return}
+      var np2=prompt('새 비밀번호 확인:');
+      if(np!==np2){toast('비밀번호가 일치하지 않습니다');return}
+      acc[user].pw=np;saveAccounts(acc);toast('비밀번호가 변경되었습니다');
+    }
+  };})();

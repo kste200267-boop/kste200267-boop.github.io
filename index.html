@@ -34,10 +34,11 @@
       <span class="topbar-logo" onclick="Router.go('home')" style="cursor:pointer">🏫 경북기계금속고</span>
     </div>
     <div class="topbar-right">
-      <div>
+      <div style="cursor:pointer" onclick="Router.go('profile')">
         <div class="topbar-name" id="tName"></div>
-        <div class="topbar-sub" id="tSub"></div>
+        <div class="topbar-sub" id="tSub" style="text-decoration:underline dotted;text-underline-offset:2px"></div>
       </div>
+      <button class="t-btn" onclick="Auth.changePw()">🔑</button>
       <button class="t-btn" onclick="Auth.logout()">로그아웃</button>
     </div>
   </div>
@@ -68,6 +69,7 @@
 <script src="pages/schedule.js"></script>
 <script src="pages/tasks.js"></script>
 <script src="pages/admin.js"></script>
+<script src="pages/profile.js"></script>
 <!-- 부트 -->
 <script>
 // 초기화
@@ -79,6 +81,10 @@
   // 커스텀 시간표 로드
   var customTD = Store.get('td-custom');
   if (customTD) { for (var k in customTD) TD_ORIGINAL[k] = customTD[k]; }
+
+  // 학급 시간표 수정사항 로드
+  var classEdits = Store.get('class-edits');
+  if (classEdits) { for (var k in classEdits) CS[k] = classEdits[k]; }
 
   // 첫 실행: 기본 계정 생성
   Auth.initAccounts();

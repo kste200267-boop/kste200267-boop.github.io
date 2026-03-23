@@ -34,7 +34,7 @@ var Router=(function(){
   function go(id){
     cur=id;buildNav();
     document.getElementById('content').innerHTML='<div class="page-wrap" id="pg"></div>';
-    var pages={home:PageHome,my:PageMy,full:PageFull,swap:PageSwap,history:PageHistory,weekly:PageWeekly,meal:PageMeal,schedule:PageSchedule,tasks:PageTasks,admin:PageAdmin};
+    var pages={home:PageHome,my:PageMy,full:PageFull,swap:PageSwap,history:PageHistory,weekly:PageWeekly,meal:PageMeal,schedule:PageSchedule,tasks:PageTasks,admin:PageAdmin,profile:PageProfile};
     if(pages[id])pages[id].render();
     document.getElementById('content').scrollTop=0;
   }
