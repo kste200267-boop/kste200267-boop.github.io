@@ -88,12 +88,13 @@ var Engine=(function(){
 allCls:function(){
   var a={};
   for(var t in TD){
-    var s=TD[t].s;
+    var s=TD[t].s || [];
     for(var i=0;i<s.length;i++){
       var v=s[i];
       if(!v) continue;
       if(v==='동아리' || v==='3학선' || v==='자율') continue;
-      if(/^\d(용|기|금|선|밀)\d$/.test(v) || /^\d학생선택\(.+\)$/.test(v)){
+
+      if(/^[123](용|기|금|선|밀)\d$/.test(v) || /^[123]학생선택\(.+\)$/.test(v)){
         a[v]=1;
       }
     }
