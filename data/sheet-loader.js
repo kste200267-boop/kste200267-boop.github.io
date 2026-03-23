@@ -8,6 +8,271 @@ var SheetLoader=(function(){
 
   // CSV 파싱 (따옴표 내 콤마 처리)
   function parseCSV(text){
+  var rows = [];
+  var row = [];
+  var cell = '';
+  var inQ = false;
+
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    var next = text[i + 1];
+
+    if (inQ) {
+      if (ch === '"' && next === '"') { cell += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else { cell += ch; }
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ',') { row.push(cell.trim()); cell=''; }
+      else if (ch === '\n') { row.push(cell.trim()); rows.push(row); row=[]; cell=''; }
+      else if (ch !== '\r') { cell += ch; }
+    }
+  }
+  row.push(cell.trim());
+  if (row.some(function(v){ return v !== ''; })) rows.push(row);
+  return rows;
+}-loader.js — 구글 시트에서 시간표 자동 로드
+var SheetLoader=(function(){
+  var URLS={
+    base:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRk0Sx9pV6efzkE2ZIXqJ6mkAFESk7w1CbtpzpZXRstAvedvX2r6iLQkMkZhvFYAQ/pub?output=csv',
+    weekA:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSub-gcVUw-NI0i7aNNKgV61TIiR_nyV3EWkd2ZqwmJo_iS_ZisucANAL_P5yPRfQ/pub?output=csv',
+    weekB:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQR0jbcVpLPrMIss4RJ_XYYLUBhA-03OuHvILYOIy9c-4soTsKW45DAFQp4T4oxeg/pub?output=csv'
+  };
+
+  // CSV 파싱 (따옴표 내 콤마 처리)
+  function parseCSV(text){
+    var lines=text.split('\n');
+    var result=[];
+    for(var i=0;i<lines.length;i++){
+      var line=lines[i].replace(/\r/g,'');
+      if(!line)continue;
+      var row=[],cell='',inQ=false;
+      for(var j=0;j<line.length;j++){
+        var ch=line[j];
+        if(inQ){
+          if(ch==='"'&&line[j+1]==='"'){cell+='"';j++}
+          else if(ch==='"')inQ=false;
+          else cell+=ch;
+        }else{
+          if(ch==='"')inQ=true;
+          else if(ch===','){row.push(cell.trim());cell=''}
+          else cell+=ch;
+        }
+      }
+      row.push(cell.trim());
+      result.push(row);
+    }
+    return result;
+  }
+
+  // 학급 시간표 추출 (행5~22, B열=반이름)
+  // 열 매핑: C~I=월1~7, J~P=화1~7, Q~V=수1~6, W~AB=목1~6, AC~AH=금1~6
+  var CLASS_MAP={'용접1':'1용1','용접2':'1용2','기계1':'1기1','기계2':'1기2','금형1':'1금1','금형2':'1금2'};
+  var DAY_COLS={월:[2,3,4,5,6,7,8],화:[9,10,11,12,13,14,15],수:[16,17,18,19,20,21],목:[22,23,24,25,26,27],금:[28,29,30,31,32,33]};
+
+  function extractClasses(rows){
+  var classes = {};
+  var CLASS_MAP = {
+    '용접1':'1용1','용접2':'1용2',
+    '기계1':'1기1','기계2':'1기2',
+    '금형1':'1금1','금형2':'1금2'
+  };
+
+  var DAY_COLS = {
+    월:[2,3,4,5,6,7,8],
+    화:[9,10,11,12,13,14,15],
+    수:[16,17,18,19,20,21],
+    목:[22,23,24,25,26,27],
+    금:[28,29,30,31,32,33]
+  };
+
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var className = (row[1] || '').replace(/\n/g, '').trim();
+    var mapped = CLASS_MAP[className];
+    if (!mapped) continue;
+
+    var cls = {};
+    for (var day in DAY_COLS) {
+      var cols = DAY_COLS[day];
+      var periods = [];
+      for (var j = 0; j < cols.length; j++) {
+        var ci = cols[j];
+        var v = (ci < row.length ? row[ci] : '') || '';
+        v = v.replace(/\n/g, '').trim();
+        periods.push(v || null);
+      }
+      cls[day] = periods;
+    }
+    classes[mapped] = cls;
+  }
+  return classes;
+}ader.js — 구글 시트에서 시간표 자동 로드
+var SheetLoader=(function(){
+  var URLS={
+    base:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRk0Sx9pV6efzkE2ZIXqJ6mkAFESk7w1CbtpzpZXRstAvedvX2r6iLQkMkZhvFYAQ/pub?output=csv',
+    weekA:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSub-gcVUw-NI0i7aNNKgV61TIiR_nyV3EWkd2ZqwmJo_iS_ZisucANAL_P5yPRfQ/pub?output=csv',
+    weekB:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQR0jbcVpLPrMIss4RJ_XYYLUBhA-03OuHvILYOIy9c-4soTsKW45DAFQp4T4oxeg/pub?output=csv'
+  };
+
+  // CSV 파싱 (따옴표 내 콤마 처리)
+  function parseCSV(text){
+  var rows = [];
+  var row = [];
+  var cell = '';
+  var inQ = false;
+
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    var next = text[i + 1];
+
+    if (inQ) {
+      if (ch === '"' && next === '"') { cell += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else { cell += ch; }
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ',') { row.push(cell.trim()); cell=''; }
+      else if (ch === '\n') { row.push(cell.trim()); rows.push(row); row=[]; cell=''; }
+      else if (ch !== '\r') { cell += ch; }
+    }
+  }
+  row.push(cell.trim());
+  if (row.some(function(v){ return v !== ''; })) rows.push(row);
+  return rows;
+}-loader.js — 구글 시트에서 시간표 자동 로드
+var SheetLoader=(function(){
+  var URLS={
+    base:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRk0Sx9pV6efzkE2ZIXqJ6mkAFESk7w1CbtpzpZXRstAvedvX2r6iLQkMkZhvFYAQ/pub?output=csv',
+    weekA:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSub-gcVUw-NI0i7aNNKgV61TIiR_nyV3EWkd2ZqwmJo_iS_ZisucANAL_P5yPRfQ/pub?output=csv',
+    weekB:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQR0jbcVpLPrMIss4RJ_XYYLUBhA-03OuHvILYOIy9c-4soTsKW45DAFQp4T4oxeg/pub?output=csv'
+  };
+
+  // CSV 파싱 (따옴표 내 콤마 처리)
+  function parseCSV(text){
+    var lines=text.split('\n');
+    var result=[];
+    for(var i=0;i<lines.length;i++){
+      var line=lines[i].replace(/\r/g,'');
+      if(!line)continue;
+      var row=[],cell='',inQ=false;
+      for(var j=0;j<line.length;j++){
+        var ch=line[j];
+        if(inQ){
+          if(ch==='"'&&line[j+1]==='"'){cell+='"';j++}
+          else if(ch==='"')inQ=false;
+          else cell+=ch;
+        }else{
+          if(ch==='"')inQ=true;
+          else if(ch===','){row.push(cell.trim());cell=''}
+          else cell+=ch;
+        }
+      }
+      row.push(cell.trim());
+      result.push(row);
+    }
+    return result;
+  }
+
+  // 학급 시간표 추출 (행5~22, B열=반이름)
+  // 열 매핑: C~I=월1~7, J~P=화1~7, Q~V=수1~6, W~AB=목1~6, AC~AH=금1~6
+  var CLASS_MAP={'용접1':'1용1','용접2':'1용2','기계1':'1기1','기계2':'1기2','금형1':'1금1','금형2':'1금2'};
+  var DAY_COLS={월:[2,3,4,5,6,7,8],화:[9,10,11,12,13,14,15],수:[16,17,18,19,20,21],목:[22,23,24,25,26,27],금:[28,29,30,31,32,33]};
+
+  function extractClasses(rows){
+    var classes={};
+    for(var i=4;i<22&&i<rows.length;i++){
+      var row=rows[i];
+      var className=(row[1]||'').replace(/\n/g,'').trim();
+      var mapped=CLASS_MAP[className];
+      if(!mapped)continue;
+      var cls={};
+      for(var day in DAY_COLS){
+        var cols=DAY_COLS[day];
+        var periods=[];
+        for(var j=0;j<cols.length;j++){
+          var ci=cols[j];
+          var v=(ci<row.length)?row[ci]:'';
+          v=v.replace(/\n/g,'').trim();
+          periods.push(v||null);
+        }
+        cls[day]=periods;
+      }
+      classes[mapped]=cls;
+    }
+    return classes;
+  }
+
+  // 교사 시간표 추출 (행24=헤더 "교 사", 행25~)
+  function extractTeachers(rows){
+  var teachers = {};
+  var startRow = -1;
+
+  for (var i = 0; i < rows.length; i++) {
+    var joined = rows[i].join(' ').replace(/\s+/g, '');
+    if (joined.indexOf('교사') >= 0) { startRow = i + 1; break; }
+  }
+  if (startRow === -1) return teachers;
+
+  for (var i = startRow; i < rows.length; i++) {
+    var row = rows[i];
+    var name = (row[0] || '').replace(/\(강사\)|（강사）/g, '').trim();
+    if (!name || name.length > 20) continue;
+
+    var hours = parseInt(row[1], 10) || 0;
+    var sched = [];
+
+    for (var j = 2; j < 34; j++) {
+      var v = (j < row.length ? row[j] : '') || '';
+      v = v.replace(/\n/g, '').trim();
+      sched.push(v || null);
+    }
+    teachers[name] = { h: hours, s: sched };
+  }
+  return teachers;
+}der.js — 구글 시트에서 시간표 자동 로드
+var SheetLoader=(function(){
+  var URLS={
+    base:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRk0Sx9pV6efzkE2ZIXqJ6mkAFESk7w1CbtpzpZXRstAvedvX2r6iLQkMkZhvFYAQ/pub?output=csv',
+    weekA:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSub-gcVUw-NI0i7aNNKgV61TIiR_nyV3EWkd2ZqwmJo_iS_ZisucANAL_P5yPRfQ/pub?output=csv',
+    weekB:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQR0jbcVpLPrMIss4RJ_XYYLUBhA-03OuHvILYOIy9c-4soTsKW45DAFQp4T4oxeg/pub?output=csv'
+  };
+
+  // CSV 파싱 (따옴표 내 콤마 처리)
+  function parseCSV(text){
+  var rows = [];
+  var row = [];
+  var cell = '';
+  var inQ = false;
+
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    var next = text[i + 1];
+
+    if (inQ) {
+      if (ch === '"' && next === '"') { cell += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else { cell += ch; }
+    } else {
+      if (ch === '"') inQ = true;
+      else if (ch === ',') { row.push(cell.trim()); cell=''; }
+      else if (ch === '\n') { row.push(cell.trim()); rows.push(row); row=[]; cell=''; }
+      else if (ch !== '\r') { cell += ch; }
+    }
+  }
+  row.push(cell.trim());
+  if (row.some(function(v){ return v !== ''; })) rows.push(row);
+  return rows;
+}-loader.js — 구글 시트에서 시간표 자동 로드
+var SheetLoader=(function(){
+  var URLS={
+    base:'https://docs.google.com/spreadsheets/d/e/2PACX-1vRk0Sx9pV6efzkE2ZIXqJ6mkAFESk7w1CbtpzpZXRstAvedvX2r6iLQkMkZhvFYAQ/pub?output=csv',
+    weekA:'https://docs.google.com/spreadsheets/d/e/2PACX-1vSub-gcVUw-NI0i7aNNKgV61TIiR_nyV3EWkd2ZqwmJo_iS_ZisucANAL_P5yPRfQ/pub?output=csv',
+    weekB:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQR0jbcVpLPrMIss4RJ_XYYLUBhA-03OuHvILYOIy9c-4soTsKW45DAFQp4T4oxeg/pub?output=csv'
+  };
+
+  // CSV 파싱 (따옴표 내 콤마 처리)
+  function parseCSV(text){
     var lines=text.split('\n');
     var result=[];
     for(var i=0;i<lines.length;i++){
