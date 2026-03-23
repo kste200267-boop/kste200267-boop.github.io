@@ -123,14 +123,45 @@ input,select,textarea{font-family:var(--font)}
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);padding:8px 18px;border-radius:8px;background:#323232;color:#fff;font-size:13px;font-weight:500;z-index:2000}
 
 .demo-bar{padding:7px 12px;border-radius:6px;background:#FFF3E0;font-size:11px;color:#E65100;margin-bottom:10px}
+.week-grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(110px,1fr));
+  border:1px solid var(--bd);
+  border-radius:8px;
+  overflow:auto;
+}
+
+.day-body{
+  padding:clamp(3px, 0.7vw, 8px);
+}
+
+.ev-title{
+  font-size:clamp(10px, 0.9vw, 12px);
+}
+
+.ev-time,
+.ev-allday{
+  min-width:clamp(30px, 3vw, 40px);
+}
+@media(max-width:1024px){
+  .week-grid{
+    grid-template-columns:repeat(7,minmax(140px,1fr));
+    overflow-x:auto;
+  }
+}
 
 @media(max-width:768px){
-  .week-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
   .ev{padding:3px 5px}
   .ev-time,.ev-allday{display:none}
   .badge{font-size:8px;padding:1px 3px}
   .ev-title{font-size:10px}
   .stat-val{font-size:15px}
+}
+
+@media(max-width:560px){
+  .wrap{padding:8px}
+  .day-name{font-size:9px}
+  .day-num{font-size:13px}
 }
 </style>
 </head>
