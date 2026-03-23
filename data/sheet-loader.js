@@ -124,10 +124,11 @@ function cleanTeacherSlot(v){
 
       // 32 슬롯: 열2~33 (월1~7, 화1~7, 수1~6, 목1~6, 금1~6)
       var sched=[];
-      for(var j=2;j<34;j++){
-        var v=(j<row.length)?(row[j]||'').replace(/\n/g,'').trim():'';
-        sched.push(v||null);
-      }
+for(var j=2;j<34;j++){
+  var raw=(j<row.length)?row[j]:'';
+  var v=cleanTeacherSlot(raw);
+  sched.push(v);
+}
 
       teachers[name]={h:hours,s:sched};
     }
