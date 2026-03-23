@@ -48,6 +48,9 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Firebase SDK (compat 버전 - 간단) -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <!-- 데이터 -->
 <script src="data/teachers.js"></script>
 <script src="data/classes.js"></script>
@@ -72,31 +75,35 @@
 <script src="pages/profile.js"></script>
 <!-- 부트 -->
 <script>
-// 초기화
 (function() {
-  // 저장된 교시 시간 로드
-  var savedPT = Store.get('pt');
-  if (savedPT) PT = savedPT;
+  // 1. Firebase 초기화
+  initFirebase();
 
-  // 커스텀 시간표 로드
-  var customTD = Store.get('td-custom');
-  if (customTD) { for (var k in customTD) TD_ORIGINAL[k] = customTD[k]; }
+  // 2. Firebase에서 데이터 동기화 후 앱 시작
+  Store.syncFromFirebase(function() {
+    // 저장된 교시 시간 로드
+    var savedPT = Store.get('pt');
+    if (savedPT) PT = savedPT;
 
-  // 학급 시간표 수정사항 로드
-  var classEdits = Store.get('class-edits');
-  if (classEdits) { for (var k in classEdits) CS[k] = classEdits[k]; }
+    // 커스텀 시간표 로드
+    var customTD = Store.get('td-custom');
+    if (customTD) { for (var k in customTD) TD_ORIGINAL[k] = customTD[k]; }
 
-  // 첫 실행: 기본 계정 생성
-  Auth.initAccounts();
+    // 학급 시간표 수정사항 로드
+    var classEdits = Store.get('class-edits');
+    if (classEdits) { for (var k in classEdits) CS[k] = classEdits[k]; }
 
-  // 과목 오버라이드 적용
-  Engine.rebuild();
-  if (typeof PageAdmin !== 'undefined' && PageAdmin.initOverrides) PageAdmin.initOverrides();
+    // 첫 실행: 기본 계정 생성
+    Auth.initAccounts();
 
-  // 자동 로그인 시도
-  if (!Auth.tryAutoLogin()) {
-    document.getElementById('loginScreen').style.display = 'flex';
-  }
+    // 엔진 빌드
+    Engine.rebuild();
+
+    // 자동 로그인 시도
+    if (!Auth.tryAutoLogin()) {
+      document.getElementById('loginScreen').style.display = 'flex';
+    }
+  });
 })();
 </script>
 </body>
