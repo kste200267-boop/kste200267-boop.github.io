@@ -6,29 +6,51 @@ var SheetLoader=(function(){
     weekB:'https://docs.google.com/spreadsheets/d/e/2PACX-1vQR0jbcVpLPrMIss4RJ_XYYLUBhA-03OuHvILYOIy9c-4soTsKW45DAFQp4T4oxeg/pub?output=csv'
   };
 
-  // CSV 파싱 (따옴표 내 콤마 처리)
+  // CSV 파싱 (따옴표 내 콤마 + 셀 내 줄바꿈 처리)
   function parseCSV(text){
-    var lines=text.split('\n');
+    text=(text||'').replace(/\r/g,'');
     var result=[];
-    for(var i=0;i<lines.length;i++){
-      var line=lines[i].replace(/\r/g,'');
-      if(!line)continue;
-      var row=[],cell='',inQ=false;
-      for(var j=0;j<line.length;j++){
-        var ch=line[j];
-        if(inQ){
-          if(ch==='"'&&line[j+1]==='"'){cell+='"';j++}
-          else if(ch==='"')inQ=false;
-          else cell+=ch;
+    var row=[];
+    var cell='';
+    var inQ=false;
+
+    for(var i=0;i<text.length;i++){
+      var ch=text[i];
+      var next=text[i+1];
+
+      if(inQ){
+        if(ch==='"' && next==='"'){
+          cell+='"';
+          i++;
+        }else if(ch==='"'){
+          inQ=false;
         }else{
-          if(ch==='"')inQ=true;
-          else if(ch===','){row.push(cell.trim());cell=''}
-          else cell+=ch;
+          cell+=ch;
+        }
+      }else{
+        if(ch==='"'){
+          inQ=true;
+        }else if(ch===','){
+          row.push(cell.trim());
+          cell='';
+        }else if(ch==='\n'){
+          row.push(cell.trim());
+          if(row.some(function(v){ return v!==''; })){
+            result.push(row);
+          }
+          row=[];
+          cell='';
+        }else{
+          cell+=ch;
         }
       }
-      row.push(cell.trim());
+    }
+
+    row.push(cell.trim());
+    if(row.some(function(v){ return v!==''; })){
       result.push(row);
     }
+
     return result;
   }
 
@@ -51,7 +73,7 @@ var SheetLoader=(function(){
         for(var j=0;j<cols.length;j++){
           var ci=cols[j];
           var v=(ci<row.length)?row[ci]:'';
-          v=v.replace(/\n/g,'').trim();
+          v=(v||'').replace(/\n/g,'').trim();
           periods.push(v||null);
         }
         cls[day]=periods;
@@ -61,26 +83,41 @@ var SheetLoader=(function(){
     return classes;
   }
 
-  // 교사 시간표 추출 (행24=헤더 "교 사", 행25~)
+  // 교사 시간표 추출 (헤더 위치가 조금 달라도 탐색)
   function extractTeachers(rows){
     var teachers={};
     var started=false;
+
     for(var i=0;i<rows.length;i++){
       var row=rows[i];
-      var first=(row[0]||'').replace(/\n/g,'').trim();
-      if(first.indexOf('교')>=0&&first.indexOf('사')>=0){started=true;continue}
+
+      if(!started){
+        var joined=row.join(' ').replace(/\n/g,'').replace(/\s+/g,'');
+        if(joined.indexOf('교사')>=0){
+          started=true;
+          continue;
+        }
+      }
+
       if(!started)continue;
+
+      var first=(row[0]||'').replace(/\n/g,'').trim();
       var name=first.replace(/\(강사\)/g,'').replace(/（강사）/g,'').trim();
+
       if(!name)continue;
-      var hours=parseInt(row[1])||0;
+
+      var hours=parseInt(row[1],10)||0;
+
       // 32 슬롯: 열2~33 (월1~7, 화1~7, 수1~6, 목1~6, 금1~6)
       var sched=[];
       for(var j=2;j<34;j++){
         var v=(j<row.length)?(row[j]||'').replace(/\n/g,'').trim():'';
         sched.push(v||null);
       }
+
       teachers[name]={h:hours,s:sched};
     }
+
     return teachers;
   }
 
@@ -101,7 +138,7 @@ var SheetLoader=(function(){
       if(done>=total){
         // CS 초기화
         CS={};
-        for(var k in CS_A){CS[k]={};for(var d in CS_A[k])CS[k][d]=CS_A[k][d].slice()}
+        for(var k in CS_A){CS[k]={};for(var d in CS_A[k])CS[k][d]=CS_A[k][d].slice();}
         // 로드 완료 시간 저장
         Store.set('sheet-loaded',new Date().toISOString());
         if(cb)cb(error);
@@ -110,7 +147,7 @@ var SheetLoader=(function(){
 
     // A주 (1,2주차)
     loadSheet(URLS.weekA,function(err,rows){
-      if(err){error=err;check();return}
+      if(err){error=err;check();return;}
       TD_A=extractTeachers(rows);
       CS_A=extractClasses(rows);
       // 로컬 캐시
@@ -123,7 +160,7 @@ var SheetLoader=(function(){
 
     // B주 (3,4주차)
     loadSheet(URLS.weekB,function(err,rows){
-      if(err){error=err;check();return}
+      if(err){error=err;check();return;}
       TD_B=extractTeachers(rows);
       CS_B=extractClasses(rows);
       try{
@@ -147,7 +184,7 @@ var SheetLoader=(function(){
       if(cb2)CS_B=JSON.parse(cb2);
       if(a||b){
         CS={};
-        for(var k in CS_A){CS[k]={};for(var d in CS_A[k])CS[k][d]=CS_A[k][d].slice()}
+        for(var k in CS_A){CS[k]={};for(var d in CS_A[k])CS[k][d]=CS_A[k][d].slice();}
         return true;
       }
     }catch(e){}
