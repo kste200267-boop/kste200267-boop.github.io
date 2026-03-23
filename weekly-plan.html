@@ -15,7 +15,11 @@ body{font-family:var(--font);background:var(--bg2);color:var(--tx);-webkit-font-
 button{font-family:var(--font);cursor:pointer}
 input,select,textarea{font-family:var(--font)}
 
-.wrap{max-width:1060px;margin:0 auto;padding:12px 16px}
+.wrap{
+  width:min(100%, 1800px);
+  margin:0 auto;
+  padding:clamp(8px, 1.5vw, 20px);
+}
 .header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px}
 .header h1{font-size:18px;font-weight:700;letter-spacing:-0.02em}
 .header small{font-size:12px;color:var(--tx2)}
