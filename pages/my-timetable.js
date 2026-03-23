@@ -28,7 +28,7 @@ var PageMy=(function(){
     var mon=w.mon,sun=new Date(mon);sun.setDate(mon.getDate()+4);
     var label=(mon.getMonth()+1)+'/'+mon.getDate()+'~'+(sun.getMonth()+1)+'/'+sun.getDate()+' ('+w.key+')';
 
-    var h='<div class="card"><div class="card-h">📅 '+U+' 시간표<span class="right"><button class="a-btn '+(editMode?'danger':'outline')+' sm" onclick="PageMy.toggleEdit()">'+(editMode?'✓ 완료':'✏️ 편집')+'</button></span></div>';
+    var h='<div class="card"><div class="card-h">📅 '+U+' 시간표 <span style="font-size:.75em;padding:2px 8px;border-radius:10px;background:'+(Engine.currentType()==='A'?'var(--blue)':'var(--purple)')+';color:#fff;font-weight:600">'+Engine.currentType()+'주</span><span class="right"><button class="a-btn '+(editMode?'danger':'outline')+' sm" onclick="PageMy.toggleEdit()">'+(editMode?'✓ 완료':'✏️ 편집')+'</button></span></div>';
     h+='<div class="week-nav"><button onclick="PageMy.prev()">◀</button><span class="wk-label">'+label+'</span><button onclick="PageMy.next()">▶</button><button onclick="PageMy.today()" style="margin-left:4px">이번주</button></div>';
     if(editMode)h+='<div style="padding:6px 10px;background:#fff3e0;border-radius:6px;font-size:.8em;color:#e65100;margin-bottom:8px">✏️ 셀 클릭하여 수업 반 입력. 빈칸=빈시간</div>';
 
@@ -117,11 +117,11 @@ var PageMy=(function(){
 
   function editCell(si,day,period){
     var U=App.getUser(),edits=getMyEdits(U);
-    var cur=edits.hasOwnProperty(String(si))?edits[String(si)]:(TD_ORIGINAL[U]?TD_ORIGINAL[U].s[si]:'');
+    var cur=edits.hasOwnProperty(String(si))?edits[String(si)]:(TD_A[U]?TD_A[U].s[si]:'');
     var val=prompt(day+' '+period+'교시 수업 반:',cur||'');
     if(val===null)return;
     edits[String(si)]=val.trim()||null;setMyEdits(U,edits);
-    if(TD_ORIGINAL[U])TD_ORIGINAL[U].s[si]=val.trim()||null;
+    if(TD_A[U])TD_A[U].s[si]=val.trim()||null;
     Engine.rebuild();toast('수정됨');render();
   }
 

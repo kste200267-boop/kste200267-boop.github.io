@@ -27,7 +27,7 @@ var PageAdmin=(function(){
     document.getElementById('ac').innerHTML=h;
   }
   function saveAcc(c){var acc=Auth.getAccounts();for(var i=0;i<c;i++){var el=document.getElementById('ai'+i);if(!el)continue;var k=el.dataset.k;acc[k].id=el.value.trim()||k;acc[k].pw=document.getElementById('ap'+i).value||'1234';acc[k].role=document.getElementById('ar'+i).value}Auth.saveAccounts(acc);toast('저장됨')}
-  function addAcc(){var n=document.getElementById('nn').value.trim();if(!n){toast('이름 입력');return}var acc=Auth.getAccounts();if(acc[n]){toast('이미 존재');return}acc[n]={id:document.getElementById('ni').value.trim()||n,pw:document.getElementById('np').value||'1234',role:document.getElementById('nr').value};if(!TD_ORIGINAL[n])TD_ORIGINAL[n]={h:0,s:new Array(32).fill(null)};Auth.saveAccounts(acc);Engine.rebuild();toast(n+' 추가');render()}
+  function addAcc(){var n=document.getElementById('nn').value.trim();if(!n){toast('이름 입력');return}var acc=Auth.getAccounts();if(acc[n]){toast('이미 존재');return}acc[n]={id:document.getElementById('ni').value.trim()||n,pw:document.getElementById('np').value||'1234',role:document.getElementById('nr').value};var empty={h:0,s:new Array(32).fill(null)};if(!TD_A[n])TD_A[n]={h:0,s:new Array(32).fill(null)};if(!TD_B[n])TD_B[n]={h:0,s:new Array(32).fill(null)};Auth.saveAccounts(acc);Engine.rebuild();toast(n+' 추가');render()}
   function delAcc(n){if(n===App.getUser()){toast('본인 삭제 불가');return}if(!confirm(n+' 삭제?'))return;var acc=Auth.getAccounts();delete acc[n];Auth.saveAccounts(acc);toast('삭제됨');render()}
   function resetAcc(){if(!confirm('전체 초기화?'))return;Store.remove('accounts');Auth.initAccounts();toast('완료');render()}
 
@@ -42,21 +42,93 @@ var PageAdmin=(function(){
   }
   function saveSubj(c){var ov={};for(var i=0;i<c;i++){var el=document.getElementById('so'+i);if(!el)continue;var v=el.value.trim();if(v)ov[el.dataset.k]=v}Store.set('subj-ov',ov);applySubjOv();toast('저장됨')}
 
-  // ── 시간표 CSV ──
+  // ── 시간표 (교사별 직접 편집) ──
+  var ttSelTeacher=null;
   function rTT(){
-    var h='<h3 style="font-size:.92em;margin-bottom:8px">📅 교사 시간표 관리</h3>';
-    h+='<div style="padding:12px;background:var(--bg2);border-radius:6px;margin-bottom:12px">';
-    h+='<p style="font-size:.82em;color:var(--tx2);margin-bottom:8px">CSV: 교사명,시수,월1,...,금6 (34열)</p>';
+    var names=Engine.names();
+    if(!ttSelTeacher)ttSelTeacher=names[0];
+    var h='<h3 style="font-size:.92em;margin-bottom:8px">📅 교사 시간표 편집</h3>';
+    h+='<p style="color:var(--tx2);font-size:.82em;margin-bottom:10px">교사를 선택하고 각 칸을 직접 수정하세요. 형식: <b>반명</b> (예: 1용1, 2기2) 또는 빈칸.</p>';
+
+    // 교사 선택
+    h+='<div class="filter-row" style="margin-bottom:10px"><span class="filter-label">교사:</span>';
+    h+='<select class="ti-sel" id="ttTeacher" onchange="PageAdmin.selTTTeacher(this.value)" style="max-width:200px">';
+    for(var i=0;i<names.length;i++){var n=names[i];
+      h+='<option value="'+n+'"'+(n===ttSelTeacher?' selected':'')+'>'+n+' ('+Engine.TS()[n]+' · '+Engine.TD()[n].h+'h)</option>';}
+    h+='</select></div>';
+
+    // 시간표 표
+    var t=TD_A[ttSelTeacher];
+    if(t){
+      h+='<div style="overflow-x:auto"><table class="a-table" style="font-size:.82em"><thead><tr><th style="width:60px"></th>';
+      for(var di=0;di<5;di++)h+='<th>'+DAYS[di]+'</th>';
+      h+='</tr></thead><tbody>';
+      var idx=0;
+      for(var di=0;di<5;di++){
+        for(var p=0;p<DP[DAYS[di]];p++){
+          // 표는 교시(행) × 요일(열) 구조
+        }
+      }
+      // 행=교시, 열=요일
+      for(var p=0;p<7;p++){
+        h+='<tr><th style="background:var(--bg2);font-weight:600">'+(p+1)+'교시<br><span style="font-weight:400;font-size:.85em;color:var(--tx3)">'+PT[p].s+'</span></th>';
+        for(var di=0;di<5;di++){
+          var d=DAYS[di];
+          if(p>=DP[d]){h+='<td style="background:var(--bg3);color:var(--tx3)">—</td>';continue}
+          var si=Engine.si(d,p);
+          var val=t.s[si]||'';
+          // 과목도 표시
+          var subj='';
+          if(val&&CS[val]&&CS[val][d])subj=CS[val][d][p]||'';
+          h+='<td style="padding:2px"><input class="ti-input" style="padding:4px 6px;font-size:.82em;width:100%;text-align:center'+(val?';background:#e8f0fe':'')+'" value="'+val+'" data-teacher="'+ttSelTeacher+'" data-si="'+si+'" placeholder="—">';
+          if(subj)h+='<div style="font-size:.7em;color:var(--tx3);text-align:center">'+subj+'</div>';
+          h+='</td>';
+        }
+        h+='</tr>';
+      }
+      h+='</tbody></table></div>';
+      h+='<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">';
+      h+='<button class="a-btn primary" onclick="PageAdmin.saveTT()">💾 이 교사 시간표 저장</button>';
+      h+='<button class="a-btn outline" onclick="PageAdmin.resetTT()">↩️ 원래대로</button>';
+      h+='</div>';
+    }
+
+    // CSV 업로드는 접기로 유지
+    h+='<details style="margin-top:16px"><summary style="font-size:.85em;color:var(--tx2);cursor:pointer">📊 CSV 일괄 업로드/다운로드</summary>';
+    h+='<div style="padding:10px;background:var(--bg2);border-radius:6px;margin-top:6px">';
     h+='<input type="file" id="csvF" accept=".csv" style="margin-bottom:6px"><br>';
-    h+='<button class="a-btn primary" onclick="PageAdmin.upCSV()">📊 업로드</button> <button class="a-btn outline" onclick="PageAdmin.dlCSV()">📥 양식 다운로드</button></div>';
-    h+='<div style="max-height:250px;overflow-y:auto"><table class="a-table"><thead><tr><th>이름</th><th>과목</th><th>시수</th></tr></thead><tbody>';
-    var names=Engine.names(),TD=Engine.TD(),TS=Engine.TS();
-    for(var i=0;i<names.length;i++){var n=names[i];h+='<tr><td>'+n+'</td><td>'+TS[n]+'</td><td>'+TD[n].h+'</td></tr>'}
-    h+='</tbody></table></div>';
+    h+='<button class="a-btn primary sm" onclick="PageAdmin.upCSV()">업로드</button> <button class="a-btn outline sm" onclick="PageAdmin.dlCSV()">양식 다운로드</button>';
+    h+='</div></details>';
+
     document.getElementById('ac').innerHTML=h;
   }
-  function upCSV(){var f=document.getElementById('csvF');if(!f.files.length){toast('파일 선택');return}var r=new FileReader();r.onload=function(e){try{var lines=e.target.result.split('\n'),cnt=0;for(var i=1;i<lines.length;i++){var c=lines[i].split(',');if(c.length<34)continue;var name=c[0].trim(),hours=parseInt(c[1])||0,sched=[];for(var j=2;j<34;j++){var v=c[j]?c[j].trim():'';sched.push(v&&v!=='-'&&v!=='null'?v:null)}if(name){TD_ORIGINAL[name]={h:hours,s:sched};var acc=Auth.getAccounts();if(!acc[name]){acc[name]={id:name,pw:'1234',role:'user'};Auth.saveAccounts(acc)}cnt++}}Engine.rebuild();toast(cnt+'명 완료');render()}catch(err){toast('오류')}};r.readAsText(f.files[0],'UTF-8')}
-  function dlCSV(){var hd='교사명,시수,월1,월2,월3,월4,월5,월6,월7,화1,화2,화3,화4,화5,화6,화7,수1,수2,수3,수4,수5,수6,목1,목2,목3,목4,목5,목6,금1,금2,금3,금4,금5,금6\n',bd='';var names=Object.keys(TD_ORIGINAL).sort();for(var i=0;i<names.length;i++){var n=names[i],t=TD_ORIGINAL[n];bd+=n+','+t.h;for(var j=0;j<t.s.length;j++)bd+=','+(t.s[j]||'');bd+='\n'}var blob=new Blob(['\uFEFF'+hd+bd],{type:'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='시간표_양식.csv';a.click();toast('다운로드')}
+  function selTTTeacher(name){ttSelTeacher=name;rTT()}
+  function saveTT(){
+    var inputs=document.querySelectorAll('[data-teacher][data-si]');
+    var teacher=ttSelTeacher;
+    if(!TD_A[teacher])return;
+    for(var i=0;i<inputs.length;i++){
+      if(inputs[i].dataset.teacher!==teacher)continue;
+      var si=parseInt(inputs[i].dataset.si);
+      var val=inputs[i].value.trim();
+      TD_A[teacher].s[si]=val||null;
+    }
+    // 시수 자동 계산
+    var cnt=0;for(var j=0;j<TD_A[teacher].s.length;j++){if(TD_A[teacher].s[j])cnt++}
+    TD_A[teacher].h=cnt;
+    // Firebase에 저장
+    Store.set('td-custom-'+teacher,{h:cnt,s:TD_A[teacher].s});
+    Engine.rebuild();
+    toast(teacher+' 시간표 저장됨 ('+cnt+'시수)');
+    rTT();
+  }
+  function resetTT(){
+    if(!confirm(ttSelTeacher+' 시간표를 원본으로 되돌릴까요?'))return;
+    Store.remove('td-custom-'+ttSelTeacher);
+    toast('원본으로 복원하려면 페이지를 새로고침하세요');
+  }
+  function upCSV(){var f=document.getElementById('csvF');if(!f.files.length){toast('파일 선택');return}var r=new FileReader();r.onload=function(e){try{var lines=e.target.result.split('\n'),cnt=0;for(var i=1;i<lines.length;i++){var c=lines[i].split(',');if(c.length<34)continue;var name=c[0].trim(),hours=parseInt(c[1])||0,sched=[];for(var j=2;j<34;j++){var v=c[j]?c[j].trim():'';sched.push(v&&v!=='-'&&v!=='null'?v:null)}if(name){TD_A[name]={h:hours,s:sched};var acc=Auth.getAccounts();if(!acc[name]){acc[name]={id:name,pw:'1234',role:'user'};Auth.saveAccounts(acc)}cnt++}}Engine.rebuild();toast(cnt+'명 완료');render()}catch(err){toast('오류')}};r.readAsText(f.files[0],'UTF-8')}
+  function dlCSV(){var hd='교사명,시수,월1,월2,월3,월4,월5,월6,월7,화1,화2,화3,화4,화5,화6,화7,수1,수2,수3,수4,수5,수6,목1,목2,목3,목4,목5,목6,금1,금2,금3,금4,금5,금6\n',bd='';var names=Object.keys(TD_A).sort();for(var i=0;i<names.length;i++){var n=names[i],t=TD_A[n];bd+=n+','+t.h;for(var j=0;j<t.s.length;j++)bd+=','+(t.s[j]||'');bd+='\n'}var blob=new Blob(['\uFEFF'+hd+bd],{type:'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='시간표_양식.csv';a.click();toast('다운로드')}
 
   // ── 학급 시간표 수정 ──
   function rClassEdit(){
@@ -248,7 +320,7 @@ var PageAdmin=(function(){
   function clr(){if(!confirm('전체 삭제?'))return;var ks=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('gm-')===0)ks.push(k)}ks.forEach(function(k){localStorage.removeItem(k)});location.reload()}
 
   return{render:render,tab:function(t){tab=t;render()},saveAcc:saveAcc,addAcc:addAcc,delAcc:delAcc,resetAcc:resetAcc,saveSubj:saveSubj,upCSV:upCSV,dlCSV:dlCSV,
+    selTTTeacher:selTTTeacher,saveTT:saveTT,resetTT:resetTT,
     saveClass:saveClass,editAfterFor:editAfterFor,addAfterBulk:addAfterBulk,addNotice:addNotice,delNotice:delNotice,doPrint:doPrint,savePT:savePT,exp:exp,imp:imp,clr:clr};
 })();
-function applySubjOv(){var ov=Store.get('subj-ov',{});var TS=Engine.TS();for(var k in ov)if(TS[k])TS[k]=ov[k]}
-var _oRb=Engine.rebuild;Engine.rebuild=function(w){_oRb(w);applySubjOv()};
+// 과목 오버라이드는 Engine.rebuild() 내부에서 처리됨

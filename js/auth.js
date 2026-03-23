@@ -3,7 +3,7 @@ var Auth=(function(){
   function initAccounts(){
     if(Store.get('accounts',null))return;
     var acc={};
-    for(var name in TD_ORIGINAL)acc[name]={id:name,pw:'1234',role:'user'};
+    for(var name in TD_A)acc[name]={id:name,pw:'1234',role:'user'};
     acc['김스데반']={id:'김스데반',pw:'1120',role:'admin'};
     Store.set('accounts',acc);
   }
@@ -32,7 +32,7 @@ var Auth=(function(){
   }
   function tryAutoLogin(){
     var sess=Store.get('session',null);
-    if(sess&&TD_ORIGINAL[sess.name]){showApp(sess.name,sess.role==='admin');return true}
+    if(sess&&(TD_A[sess.name]||Store.get('td-custom-'+sess.name))){showApp(sess.name,sess.role==='admin');return true}
     return false;
   }
   function showApp(name,isAdmin){

@@ -85,18 +85,10 @@
     var savedPT = Store.get('pt');
     if (savedPT) PT = savedPT;
 
-    // 커스텀 시간표 로드
-    var customTD = Store.get('td-custom');
-    if (customTD) { for (var k in customTD) TD_ORIGINAL[k] = customTD[k]; }
-
-    // 학급 시간표 수정사항 로드
-    var classEdits = Store.get('class-edits');
-    if (classEdits) { for (var k in classEdits) CS[k] = classEdits[k]; }
-
     // 첫 실행: 기본 계정 생성
     Auth.initAccounts();
 
-    // 엔진 빌드
+    // 엔진 빌드 (A/B주 자동 판별, 커스텀/오버라이드 모두 반영)
     Engine.rebuild();
 
     // 자동 로그인 시도
