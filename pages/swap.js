@@ -5,7 +5,12 @@ var PageSwap=(function(){
     sT=sT||App.getUser();
     var h='<div class="card"><div class="card-h">🔄 수업 교체</div><p style="color:var(--tx2);font-size:.83em;margin-bottom:12px">교체를 확정하면 이번 주 시간표에 자동 반영되고 기록이 남습니다.</p>';
     h+='<div style="font-weight:600;font-size:.85em;margin-bottom:6px">1. 교사</div><div class="chips">';
-    var ts=Engine.names();for(var i=0;i<ts.length;i++){var t=ts[i];h+='<span class="chip'+(t===sT?' on':'')+'" onclick="PageSwap.pickT(\''+t+'\')">'+t+'<span class="csub">'+Engine.TS()[t]+'</span></span>'}
+    var ts=Engine.names();
+for(var i=0;i<ts.length;i++){
+  var t=ts[i];
+  var sub=Engine.TS()[t]||''; // ⭐ 추가
+  h+='<span class="chip'+(t===sT?' on':'')+'" onclick="PageSwap.pickT(\''+t+'\')">'+t+'<span class="csub">'+sub+'</span></span>';
+}
     h+='</div>';
     if(sT){h+='<div style="font-weight:600;font-size:.85em;margin:10px 0 6px">2. 요일</div><div class="chips">';
       for(var di=0;di<5;di++){var d=DAYS[di],has=false;for(var p=0;p<DP[d];p++){var cl=Engine.slot(sT,d,p);if(cl&&cl.charAt(0)==='1'){has=true;break}}
