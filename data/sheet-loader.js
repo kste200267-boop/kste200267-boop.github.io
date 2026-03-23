@@ -74,29 +74,31 @@ function cleanTeacherSlot(v){
   return null;
 }
   function extractClasses(rows){
-    var classes={};
-    for(var i=4;i<22&&i<rows.length;i++){
-      var row=rows[i];
-      var className=(row[1]||'').replace(/\n/g,'').trim();
-      var mapped=CLASS_MAP[className];
-      if(!mapped)continue;
-      var cls={};
-      for(var day in DAY_COLS){
-        var cols=DAY_COLS[day];
-        var periods=[];
-        for(var j=0;j<cols.length;j++){
-          var ci=cols[j];
-          var v=(ci<row.length)?row[ci]:'';
-          v=(v||'').replace(/\n/g,'').trim();
-          periods.push(v||null);
-        }
-        cls[day]=periods;
+  var classes={};
+
+  for(var i=0;i<rows.length;i++){
+    var row=rows[i];
+    var className=(row[1]||'').replace(/\n/g,'').trim();
+    var mapped=CLASS_MAP[className];
+    if(!mapped) continue;
+
+    var cls={};
+    for(var day in DAY_COLS){
+      var cols=DAY_COLS[day];
+      var periods=[];
+      for(var j=0;j<cols.length;j++){
+        var ci=cols[j];
+        var v=(ci<row.length)?row[ci]:'';
+        v=(v||'').replace(/\n/g,'').trim();
+        periods.push(v||null);
       }
-      classes[mapped]=cls;
+      cls[day]=periods;
     }
-    return classes;
+    classes[mapped]=cls;
   }
 
+  return classes;
+}
   // 교사 시간표 추출 (헤더 위치가 조금 달라도 탐색)
 function extractTeachers(rows){
   var teachers={};
