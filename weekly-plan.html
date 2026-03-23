@@ -308,16 +308,37 @@ function apiDelete(url, cb) {
 function loadEvents() {
   state.loading = true;
   render();
-  var range = state.mode === 'week' ? getWeekRange(state.baseDate) : getMonthRange(state.baseDate.getFullYear(), state.baseDate.getMonth());
-  // 월간 뷰는 앞뒤 주도 포함
-  var tMin = new Date(range.start); tMin.setDate(tMin.getDate() - 7);
-  var tMax = new Date(range.end); tMax.setDate(tMax.getDate() + 7);
+
+  var range = state.mode === 'week'
+    ? getWeekRange(state.baseDate)
+    : getMonthRange(state.baseDate.getFullYear(), state.baseDate.getMonth());
+
+  var tMin = new Date(range.start);
+  var tMax = new Date(range.end);
+
+  // 화면이 넓을수록 월간 버퍼를 조금 더 주고,
+  // 주간 모드는 버퍼 없이 해당 주만 조회
+  var screenW = window.innerWidth || document.documentElement.clientWidth || 1200;
+
+  if (state.mode !== 'week') {
+    var extraDays = screenW >= 1400 ? 10 : screenW >= 900 ? 7 : 4;
+    tMin.setDate(tMin.getDate() - extraDays);
+    tMax.setDate(tMax.getDate() + extraDays);
+  }
+
   var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(CALENDAR_ID) +
     '/events?timeMin=' + tMin.toISOString() + '&timeMax=' + tMax.toISOString() +
     '&singleEvents=true&orderBy=startTime&maxResults=500';
+
   apiGet(url, function(data) {
-    if (data.error) { state.loading = false; render(); return; }
+    if (data.error) {
+      state.loading = false;
+      render();
+      return;
+    }
+
     sessionStorage.setItem('gtoken', state.accessToken);
+
     state.events = (data.items || []).map(function(ev) {
       var dept = classifyEvent(ev.summary || '');
       var isAllDay = !!(ev.start && ev.start.date);
@@ -333,7 +354,11 @@ function loadEvents() {
         departmentColor: dept.color,
       };
     });
-    if (!state.activeDepts) state.activeDepts = state.departments.map(function(d){return d.name});
+
+    if (!state.activeDepts) {
+      state.activeDepts = state.departments.map(function(d){ return d.name; });
+    }
+
     state.loading = false;
     render();
   });
