@@ -98,43 +98,69 @@ function cleanTeacherSlot(v){
   }
 
   // 교사 시간표 추출 (헤더 위치가 조금 달라도 탐색)
-  function extractTeachers(rows){
-    var teachers={};
-    var started=false;
+function extractTeachers(rows){
+  var teachers={};
+  var started=false;
 
-    for(var i=0;i<rows.length;i++){
-      var row=rows[i];
+  function isValidTeacherName(name){
+    name=(name||'').trim();
+    if(!name) return false;
+    if(name.length>10) return false;              // 너무 긴 건 교사명 아님
+    if(name.indexOf(',')>=0) return false;        // 쉼표 포함하면 깨진 행
+    if(name.indexOf('(')>=0 || name.indexOf(')')>=0) return false; // 관리직 등 제거
+    if(/[0-9]/.test(name)) return false;          // 숫자 포함하면 교사명 아님
+    if(/교시|요일|시간표|관리직/.test(name)) return false;
+    return /^[가-힣]+$/.test(name);               // 한글 이름만 허용
+  }
 
-      if(!started){
-        var joined=row.join(' ').replace(/\n/g,'').replace(/\s+/g,'');
-        if(joined.indexOf('교사')>=0){
-          started=true;
-          continue;
-        }
+  function cleanTeacherSlot(v){
+    v=(v||'').replace(/\n/g,'').trim();
+    if(!v) return null;
+
+    // 정상 반코드
+    if(/^[123](용|기|금|선|밀)\d$/.test(v)) return v;
+
+    // 학생선택
+    if(/^[123]학생선택\(.+\)$/.test(v)) return v;
+
+    // 기타 허용값
+    if(v==='동아리' || v==='자율' || v==='3학선') return v;
+
+    return null;
+  }
+
+  for(var i=0;i<rows.length;i++){
+    var row=rows[i];
+
+    if(!started){
+      var joined=row.join(' ').replace(/\n/g,'').replace(/\s+/g,'');
+      if(joined.indexOf('교사')>=0){
+        started=true;
+        continue;
       }
-
-      if(!started)continue;
-
-      var first=(row[0]||'').replace(/\n/g,'').trim();
-      var name=first.replace(/\(강사\)/g,'').replace(/（강사）/g,'').trim();
-
-      if(!name)continue;
-
-      var hours=parseInt(row[1],10)||0;
-
-      // 32 슬롯: 열2~33 (월1~7, 화1~7, 수1~6, 목1~6, 금1~6)
-      var sched=[];
-for(var j=2;j<34;j++){
-  var raw=(j<row.length)?row[j]:'';
-  var v=cleanTeacherSlot(raw);
-  sched.push(v);
-}
-
-      teachers[name]={h:hours,s:sched};
     }
 
-    return teachers;
+    if(!started) continue;
+
+    var first=(row[0]||'').replace(/\n/g,'').trim();
+    var name=first.replace(/\(강사\)/g,'').replace(/（강사）/g,'').trim();
+
+    // 여기서 깨진 행 차단
+    if(!isValidTeacherName(name)) continue;
+
+    var hours=parseInt(row[1],10)||0;
+    var sched=[];
+
+    for(var j=2;j<34;j++){
+      var raw=(j<row.length)?row[j]:'';
+      sched.push(cleanTeacherSlot(raw));
+    }
+
+    teachers[name]={h:hours,s:sched};
   }
+
+  return teachers;
+}
 
   // 시트 1개 로드
   function loadSheet(url,cb){
