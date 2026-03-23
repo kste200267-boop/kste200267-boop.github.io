@@ -1,759 +1,88 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>G-MIND 통합 역량 인증 시스템</title>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@300;400;700;900&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // [중요] 선생님이 제공해주신 올바른 키값을 여기에 적용했습니다.
-        const firebaseConfig = {
-            apiKey: "AIzaSyBbb1jaysjUlBjb4wFzoxQK789QQOT79GA",
-            authDomain: "g-mind-78c4a.firebaseapp.com",
-            projectId: "g-mind-78c4a",
-            storageBucket: "g-mind-78c4a.firebasestorage.app",
-            messagingSenderId: "708252783302",
-            appId: "1:708252783302:web:14f5dcca23451d0f7dbdc7",
-            measurementId: "G-RJ16KGZY9N"
-        };
-
-        // 앱 초기화
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        
-        // 전역 변수 설정 (학교 앱 ID)
-        const appId = 'gmind-school-app'; 
-        
-        // 윈도우 전역 객체에 할당 (HTML 버튼에서 함수를 부르기 위해 필수)
-        window.currentStudentId = null;
-        window.classData = []; 
-        window.teacherName = localStorage.getItem('gmind_teacher_name') || '';
-        window.db = db;
-        window.appId = appId;
-        window.authReady = false;
-        window.isEditMode = true;
-
-        // 1. 서버 접속 시도 (익명 로그인)
-        async function initAuth() {
-            try {
-                await signInAnonymously(auth);
-            } catch (e) {
-                console.error("Auth Error:", e);
-                // 에러 발생 시 화면에 빨간 글씨로 표시
-                updateStatus("서버 키 오류: 콘솔(F12)을 확인하세요.", "error");
-            }
-        }
-
-        // 2. 접속 상태 감지 (로그인 성공 시 실행됨)
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                console.log("Firebase Connected:", user.uid);
-                updateStatus("🟢 서버 정상 연결됨", "success");
-                window.authReady = true;
-                loadClassList();
-            } else {
-                updateStatus("🔴 서버 연결 끊김", "error");
-            }
-        });
-
-        // 실행
-        initAuth();
-
-        // 3. 주요 기능 함수들
-        window.loadClassList = async function() {
-            if (!window.authReady) return;
-            const storedClass = localStorage.getItem('gmind_class_list_v4');
-            if (storedClass) {
-                window.classData = JSON.parse(storedClass);
-            } else {
-                // 초기 데이터 샘플
-                window.classData = [
-                    { id: '1101', name: '김철수', dept: '정밀기계과', total: 0, grade: 'Ready' },
-                    { id: '1102', name: '이영희', dept: '자동화시스템과', total: 85, grade: 'S' }
-                ];
-                saveClassLocal();
-            }
-            // 선생님 이름이 있으면 대시보드로, 없으면 로그인 화면으로
-            if(window.teacherName) showDashboard(); else showLogin();
-        };
-
-        window.showLogin = function() { hideAllViews(); document.getElementById('view-login').style.display = 'flex'; }
-        
-        window.showDashboard = function() {
-            if(!window.teacherName) {
-                const nameInput = document.getElementById('login-name').value.trim();
-                if(!nameInput) return alert("성함을 입력해주세요.");
-                window.teacherName = nameInput;
-                localStorage.setItem('gmind_teacher_name', window.teacherName);
-            }
-            document.getElementById('welcome-msg').innerText = `${window.teacherName} 선생님, 환영합니다!`;
-            hideAllViews();
-            document.getElementById('view-dashboard').style.display = 'block';
-        }
-
-        window.enterInputMode = function() {
-            window.isEditMode = true;
-            document.getElementById('list-title').innerText = "📝 학생 평가 입력 (수정 가능)";
-            showClassInput();
-        }
-        window.enterLookupMode = function() {
-            window.isEditMode = false;
-            document.getElementById('list-title').innerText = "🔍 학생 상세 조회 (읽기 전용)";
-            showClassInput();
-        }
-
-        window.showClassInput = function() {
-            hideAllViews();
-            document.getElementById('view-class').style.display = 'block';
-            renderClassGrid();
-        }
-
-        window.showStats = function() {
-            hideAllViews();
-            document.getElementById('view-stats').style.display = 'block';
-            renderCharts();
-        }
-
-        window.showAdmin = function() {
-            hideAllViews();
-            document.getElementById('view-admin').style.display = 'block';
-        }
-
-        window.logout = function() {
-            window.teacherName = '';
-            localStorage.removeItem('gmind_teacher_name');
-            showLogin();
-        }
-
-        function hideAllViews() {
-            const views = ['view-login', 'view-dashboard', 'view-class', 'view-eval', 'view-lookup', 'view-stats', 'view-admin'];
-            views.forEach(id => document.getElementById(id).style.display = 'none');
-        }
-
-        // 학생 선택 및 데이터 로드
-        window.selectStudent = async function(id) {
-            window.currentStudentId = id;
-            const student = window.classData.find(s => s.id === id);
-            
-            let data = {};
-            // 파이어베이스에서 데이터 불러오기
-            if (window.authReady) {
-                try {
-                    const docRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'gmind_records_v4', id);
-                    const docSnap = await getDoc(docRef);
-                    if (docSnap.exists()) data = docSnap.data();
-                } catch (e) { console.error("Data Load Error:", e); }
-            }
-
-            if (window.isEditMode) {
-                hideAllViews();
-                document.getElementById('view-eval').style.display = 'block';
-                setupEvalView(student, data);
-            } else {
-                hideAllViews();
-                document.getElementById('view-lookup').style.display = 'block';
-                renderLookupView(student, data);
-            }
-        };
-
-        function setupEvalView(student, data) {
-            document.getElementById('target-info').innerText = `[${student.dept}] ${student.id} ${student.name}`;
-            document.getElementById('inp-dept').value = student.dept;
-            document.getElementById('inp-id').value = student.id;
-            document.getElementById('inp-name').value = student.name;
-
-            document.getElementById('sc-job').value = data.job || 0;
-            document.getElementById('sc-char').value = data.char || 0;
-            document.getElementById('sc-pro').value = data.pro || 0;
-            document.getElementById('sc-lang').value = data.lang || 0;
-            
-            if(data.detailData) {
-                const parsed = JSON.parse(data.detailData);
-                window.jobDetails = parsed.job || { kor: 5, eng: 5, math: 5, prob: 5, certs: [] };
-                window.charDetails = parsed.char || { mileage: 0, attend: 20, after: 0, readings: [] };
-                window.currentScores = parsed.scores || { char: [], pro: [], lang: [] };
-                window.fileData = parsed.files || { job: {}, char: {}, pro: {}, lang: {}, readings: {} };
-            } else {
-                window.jobDetails = { kor: 5, eng: 5, math: 5, prob: 5, certs: [] };
-                window.charDetails = { mileage: 0, attend: 20, after: 0, readings: [] };
-                window.currentScores = { char: [], pro: [], lang: [] };
-                window.fileData = { job: {}, char: {}, pro: {}, lang: {}, readings: {} };
-            }
-            window.calc();
-        }
-
-        // 학생 데이터 저장
-        window.saveStudent = async function() {
-            if (!window.authReady) { alert("서버 미연결 상태입니다. 잠시 후 다시 시도하세요."); return; }
-            const id = window.currentStudentId;
-            const studentIdx = window.classData.findIndex(s => s.id === id);
-            
-            const total = document.getElementById('disp-total').innerText;
-            const grade = document.getElementById('disp-grade').innerText;
-
-            window.classData[studentIdx].total = Number(total);
-            window.classData[studentIdx].grade = grade;
-            saveClassLocal();
-
-            const detailData = {
-                job: window.jobDetails,
-                char: window.charDetails,
-                scores: window.currentScores,
-                files: window.fileData
-            };
-
-            const data = {
-                dept: document.getElementById('inp-dept').value,
-                studentId: id, name: document.getElementById('inp-name').value,
-                job: document.getElementById('sc-job').value,
-                char: document.getElementById('sc-char').value,
-                pro: document.getElementById('sc-pro').value,
-                lang: document.getElementById('sc-lang').value,
-                detailData: JSON.stringify(detailData),
-                updatedAt: new Date().toISOString()
-            };
-
-            try {
-                // 파이어베이스에 저장
-                await setDoc(doc(window.db, 'artifacts', window.appId, 'public', 'data', 'gmind_records_v4', id), data);
-                alert(`✅ ${window.classData[studentIdx].name} 학생 데이터가 서버에 저장되었습니다.`);
-                showClassInput();
-            } catch (e) { 
-                console.error(e);
-                alert("저장 실패: " + e.message + "\n(데이터베이스 규칙이 허용되었는지 확인하세요)"); 
-            }
-        };
-
-        function updateStatus(msg, type) {
-            const els = document.querySelectorAll('.server-status');
-            els.forEach(el => { el.innerText = msg; el.style.color = type === 'success' ? '#2ecc71' : '#e74c3c'; });
-        }
-    </script>
-
-    <style>
-        :root {
-            --c-main: #34495e; --c-acc: #3498db; --bg-body: #f4f7f6;
-            --c-job: #3498db; --c-char: #2ecc71; --c-pro: #e67e22; --c-lang: #9b59b6;
-        }
-        * { box-sizing: border-box; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg-body); margin: 0; padding: 0; color: #333; height: 100vh; overflow: hidden; word-break: keep-all; }
-        
-        .app-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; }
-        .view-section { flex: 1; overflow-y: auto; display: none; padding: 20px; animation: fadeIn 0.3s; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* 로그인 */
-        #view-login { display: flex; flex-direction: column; justify-content: center; align-items: center; background: linear-gradient(135deg, #2c3e50, #4ca1af); height: 100vh; color: white; text-align: center; }
-        .login-box { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 400px; color: #333; }
-        .login-input { width: 100%; padding: 15px; border: 2px solid #eee; border-radius: 10px; font-size: 1.1rem; margin-bottom: 20px; }
-        .btn-login { width: 100%; padding: 15px; background: var(--c-acc); color: white; border: none; border-radius: 10px; font-size: 1.2rem; font-family: 'Jua'; cursor: pointer; }
-
-        /* 대시보드 */
-        #view-dashboard { max-width: 1200px; margin: 0 auto; width: 100%; }
-        .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; background: white; padding: 20px 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-        .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-        .menu-card { background: white; padding: 30px; border-radius: 20px; cursor: pointer; transition: 0.3s; border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-        .menu-card:hover { transform: translateY(-5px); border-color: var(--c-acc); box-shadow: 0 10px 25px rgba(52, 152, 219, 0.2); }
-        .menu-icon { font-size: 3rem; margin-bottom: 15px; }
-        .menu-title { font-family: 'Jua'; font-size: 1.5rem; margin-bottom: 10px; color: #2c3e50; }
-
-        /* 학급 입력 & 조회 */
-        .toolbar { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
-        .student-card { background: white; border-radius: 15px; padding: 20px; border: 2px solid #eee; cursor: pointer; transition: 0.2s; position: relative; }
-        .student-card:hover { border-color: var(--c-acc); transform: translateY(-3px); }
-        .student-card.done { background: #f0fdf4; border-color: #2ecc71; }
-        .grade-badge { position: absolute; top: 15px; right: 15px; background: #eee; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; }
-        .student-card.done .grade-badge { background: #2ecc71; color: white; }
-
-        /* 평가 및 조회 공통 */
-        .eval-header { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
-        .score-box { background: white; border-radius: 15px; padding: 20px; text-align: center; cursor: pointer; border: 2px solid #eee; transition: 0.2s; }
-        .score-box:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-        .score-display { font-family: 'Jua'; font-size: 2.5rem; border: none; width: 100%; text-align: center; pointer-events: none; }
-
-        /* 조회(Lookup) 전용 스타일 */
-        .lookup-container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        .lookup-title { font-family: 'Jua'; font-size: 1.8rem; border-bottom: 3px solid #eee; padding-bottom: 15px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
-        .checklist-group { margin-bottom: 30px; }
-        .group-header { font-size: 1.2rem; font-weight: bold; color: #2c3e50; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
-        .group-badge { background: #eee; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; color: #666; }
-        .check-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f0; }
-        .check-item.checked { background: #f9fff9; }
-        .check-icon { font-size: 1.2rem; margin-right: 10px; }
-        .evidence-tag { background: #e3f2fd; color: #1565c0; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; margin-left: 10px; }
-
-        /* 관리자 모드 */
-        .admin-box { background: white; padding: 30px; border-radius: 15px; margin-bottom: 20px; }
-        .btn-admin { background: #34495e; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: 'Jua'; display: inline-flex; align-items: center; gap: 5px; }
-
-        /* 모달 공통 */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; display: none; justify-content: center; align-items: center; }
-        .modal-box { background: white; width: 95%; max-width: 800px; border-radius: 20px; padding: 30px; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
-        
-        /* 공통 버튼 */
-        .btn-primary { background: var(--c-acc); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: 'Jua'; }
-        .btn-secondary { background: #95a5a6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-family: 'Jua'; }
-        .btn-excel { display: inline-flex; align-items: center; gap: 5px; padding: 8px 15px; background: #27ae60; color: white; border-radius: 5px; cursor: pointer; font-size: 0.9rem; font-weight: bold; }
-        input[type="file"] { display: none; }
-
-        /* 인쇄 */
-        @media print {
-            body * { visibility: hidden; }
-            .certificate-view, .certificate-view * { visibility: visible; }
-            .certificate-view { position: absolute; left: 0; top: 0; width: 100%; height: 100%; margin: 0; padding: 0; }
-            @page { size: landscape; margin: 0; }
-        }
-        .certificate-view { display: none; width: 297mm; height: 210mm; padding: 15mm; background: white; text-align: center; border: 5px double #b8860b; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>경북기계금속고 교사포털</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a73e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<div class="app-wrapper">
-
-    <div id="view-login" class="view-section" style="display:flex;">
-        <div class="login-box">
-            <div style="font-size:3rem; margin-bottom:10px;">💎</div>
-            <h1>G-MIND 통합 관리</h1>
-            <p style="margin-bottom:30px; color:#666;">선생님 성함을 입력하여<br>업무를 시작하세요.</p>
-            <input type="text" id="login-name" class="login-input" placeholder="예: 홍길동">
-            <button class="btn-login" onclick="showDashboard()">시스템 입장</button>
-            <div class="server-status" style="margin-top:20px;">연결 대기 중...</div>
-        </div>
+<!-- ===== 로그인 화면 ===== -->
+<div id="loginScreen" class="login-wrap">
+  <div class="login-box">
+    <div class="login-title">🏫 경북기계금속고</div>
+    <div class="login-sub">교사 업무 포털</div>
+    <div class="login-form">
+      <input type="text" class="form-input" id="loginId" placeholder="아이디 (이름)">
+      <input type="password" class="form-input" id="loginPw" placeholder="비밀번호" style="margin-top:8px" onkeydown="if(event.key==='Enter')Auth.login()">
+      <button class="btn-login" onclick="Auth.login()">로그인</button>
+      <div id="loginErr" class="login-err"></div>
     </div>
-
-    <div id="view-dashboard" class="view-section">
-        <div class="dash-header">
-            <div>
-                <span class="dash-welcome" id="welcome-msg">선생님, 환영합니다!</span>
-                <div class="server-status" style="display:inline-block; margin-left:10px;"></div>
-            </div>
-            <button class="btn-secondary" onclick="logout()">로그아웃</button>
-        </div>
-
-        <div class="card-grid">
-            <div class="menu-card" onclick="enterInputMode()">
-                <div class="menu-icon">📝</div>
-                <div class="menu-title">학생 평가 입력</div>
-                <div class="menu-desc">학생들의 역량을 평가하고<br>점수를 입력합니다.</div>
-            </div>
-            <div class="menu-card" onclick="enterLookupMode()">
-                <div class="menu-icon">🔍</div>
-                <div class="menu-title">학생 상세 조회</div>
-                <div class="menu-desc">평가 결과를 상세 체크리스트<br>형태로 확인합니다.</div>
-            </div>
-            <div class="menu-card" onclick="showStats()">
-                <div class="menu-icon">📊</div>
-                <div class="menu-title">통계 현황</div>
-                <div class="menu-desc">학급 전체의 등급 분포와<br>진행률을 확인합니다.</div>
-            </div>
-            <div class="menu-card" onclick="showAdmin()">
-                <div class="menu-icon">⚙️</div>
-                <div class="menu-title">관리자 모드</div>
-                <div class="menu-desc">학급 명렬표 일괄 등록<br>및 데이터 초기화</div>
-            </div>
-        </div>
-    </div>
-
-    <div id="view-class" class="view-section">
-        <div class="toolbar">
-            <h2 id="list-title" style="margin:0; font-family:'Jua';">📝 학급 평가 관리</h2>
-            <button class="btn-secondary" onclick="showDashboard()">◀ 홈으로</button>
-        </div>
-        
-        <div class="toolbar" style="background:#f8f9fa;">
-            <div style="display:flex; gap:10px; align-items:center;">
-                <span style="font-weight:bold; color:#555;">개별점수 반영:</span>
-                <label class="btn-excel">📂 나이스 출결 <input type="file" accept=".xlsx" onchange="handleExcel(this, 'attendance')"></label>
-                <label class="btn-excel" style="background:#e67e22;">📂 방과후 <input type="file" accept=".xlsx" onchange="handleExcel(this, 'afterschool')"></label>
-            </div>
-            <div style="display:flex; gap:5px;">
-                <input type="text" id="new-name" placeholder="이름" style="padding:8px; width:80px; border:1px solid #ddd; border-radius:5px;">
-                <input type="text" id="new-id" placeholder="학번" style="padding:8px; width:80px; border:1px solid #ddd; border-radius:5px;">
-                <button class="btn-primary" onclick="addStudent()">추가</button>
-            </div>
-        </div>
-        <div class="student-grid" id="student-grid"></div>
-    </div>
-
-    <div id="view-eval" class="view-section">
-        <div class="eval-header">
-            <div>
-                <button class="btn-secondary" onclick="showClassInput()">◀ 목록</button>
-                <span id="target-info" style="margin-left:15px; font-weight:bold; font-size:1.2rem;"></span>
-            </div>
-            <button class="btn-primary" onclick="saveStudent()">💾 저장 완료</button>
-        </div>
-        <input type="hidden" id="inp-dept"><input type="hidden" id="inp-id"><input type="hidden" id="inp-name">
-
-        <div class="score-grid">
-            <div class="score-box type-job" onclick="openRubric('job')">
-                <h3>직업기초</h3>
-                <input type="text" id="sc-job" class="score-display" value="0" readonly>
-            </div>
-            <div class="score-box type-char" onclick="openRubric('char')">
-                <h3>인성능력</h3>
-                <input type="text" id="sc-char" class="score-display" value="0" readonly>
-            </div>
-            <div class="score-box type-pro" onclick="openRubric('pro')">
-                <h3>전공역량</h3>
-                <input type="text" id="sc-pro" class="score-display" value="0" readonly>
-            </div>
-            <div class="score-box type-lang" onclick="openRubric('lang')">
-                <h3>외국어</h3>
-                <input type="text" id="sc-lang" class="score-display" value="0" readonly>
-            </div>
-        </div>
-        <div style="text-align:center; padding:20px;">
-            <span style="font-size:1.5rem;">총점: <strong id="disp-total" style="color:#f1c40f;">0</strong> / 등급: <strong id="disp-grade" style="color:#34495e;">Ready</strong></span>
-        </div>
-    </div>
-
-    <div id="view-lookup" class="view-section">
-        <div class="lookup-container">
-            <div class="lookup-title">
-                <div>
-                    <span id="lookup-name" style="color:#2c3e50;">홍길동</span> 
-                    <span id="lookup-info" style="font-size:1rem; color:#7f8c8d; margin-left:10px;">(1101)</span>
-                </div>
-                <button class="btn-secondary" onclick="showClassInput()">◀ 목록으로</button>
-            </div>
-
-            <div style="margin-bottom:30px; text-align:center; background:#f8f9fa; padding:20px; border-radius:15px;">
-                <span style="font-size:2rem; font-weight:bold; color:#2c3e50;">종합 등급: <span id="lookup-grade" style="color:#f1c40f;">G</span></span>
-                <span style="font-size:1.2rem; margin-left:15px; color:#555;">(총점: <span id="lookup-total">0</span>점)</span>
-            </div>
-
-            <div id="lookup-content">
-                </div>
-        </div>
-    </div>
-
-    <div id="view-stats" class="view-section">
-        <div class="toolbar">
-            <h2 style="margin:0; font-family:'Jua';">📊 우리 반 통계</h2>
-            <button class="btn-secondary" onclick="showDashboard()">◀ 홈으로</button>
-        </div>
-        <div class="chart-container" style="background:white; padding:30px; border-radius:20px;">
-            <div style="display:flex; gap:20px; height:400px;">
-                <div style="flex:1;"><canvas id="chart-grade"></canvas></div>
-                <div style="flex:1;"><canvas id="chart-progress"></canvas></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="view-admin" class="view-section">
-        <div class="toolbar">
-            <h2 style="margin:0; font-family:'Jua';">⚙️ 관리자 설정</h2>
-            <button class="btn-secondary" onclick="showDashboard()">◀ 홈으로</button>
-        </div>
-
-        <div class="admin-box">
-            <h3 style="margin-top:0;">📂 학급 명렬표 일괄 등록</h3>
-            <p style="color:#666; font-size:0.9rem;">엑셀 파일에 [학년, 반, 번호, 이름, 학과] 열이 포함되어 있어야 합니다.<br>(예: 1학년 3반 5번 -> 학번 1305 자동생성)</p>
-            <label class="btn-admin">
-                📑 명렬표 엑셀 업로드
-                <input type="file" accept=".xlsx, .xls" onchange="handleRosterExcel(this)">
-            </label>
-        </div>
-
-        <div class="admin-box">
-            <h3 style="margin-top:0;">⚠️ 데이터 초기화</h3>
-            <p style="color:#e74c3c; font-weight:bold;">※ 모든 학생 데이터가 삭제됩니다.</p>
-            <button class="btn-secondary" style="background:#e74c3c;" onclick="clearAllData()">전체 초기화</button>
-        </div>
-    </div>
-
+  </div>
 </div>
 
-<div id="rubric-modal" class="modal-overlay">
-    <div class="modal-box">
-        <h2 id="modal-title" style="margin:0 0 15px 0; font-family:Jua; border-bottom:2px solid #eee; padding-bottom:10px;">세부 평가</h2>
-        <div id="modal-content"></div>
-        <div style="margin-top:20px; text-align:right;">
-             <span style="font-size:1.2rem; margin-right:20px;">합계: <strong id="modal-score" style="color:#e74c3c;">0</strong>점</span>
-            <button class="btn-primary" onclick="closeRubric()">반영하기</button>
-        </div>
+<!-- ===== 앱 쉘 ===== -->
+<div class="shell" id="shell">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo" onclick="Router.go('home')" style="cursor:pointer">🏫 경북기계금속고</span>
     </div>
+    <div class="topbar-right">
+      <div>
+        <div class="topbar-name" id="tName"></div>
+        <div class="topbar-sub" id="tSub"></div>
+      </div>
+      <button class="t-btn" onclick="Auth.logout()">로그아웃</button>
+    </div>
+  </div>
+  <div class="sidebar" id="sidebar"></div>
+  <div class="content" id="content"></div>
 </div>
 
+<div class="toast" id="toast"></div>
+
+<!-- 데이터 -->
+<script src="data/teachers.js"></script>
+<script src="data/classes.js"></script>
+<!-- 코어 -->
+<script src="js/store.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/router.js"></script>
+<!-- 페이지 -->
+<script src="pages/home.js"></script>
+<script src="pages/my-timetable.js"></script>
+<script src="pages/all-timetable.js"></script>
+<script src="pages/swap.js"></script>
+<script src="pages/history.js"></script>
+<script src="pages/weekly.js"></script>
+<script src="pages/meal.js"></script>
+<script src="pages/schedule.js"></script>
+<script src="pages/tasks.js"></script>
+<script src="pages/admin.js"></script>
+<!-- 부트 -->
 <script>
-    // [데이터 초기화]
-    window.jobDetails = { kor: 5, eng: 5, math: 5, prob: 5, certs: [] };
-    window.charDetails = { mileage: 0, attend: 20, after: 0, readings: [] };
-    window.currentScores = { char: [], pro: [], lang: [] };
-    window.fileData = { job: {}, char: {}, pro: {}, lang: {}, readings: {} };
+// 초기화
+(function() {
+  // 저장된 교시 시간 로드
+  var savedPT = Store.get('pt');
+  if (savedPT) PT = savedPT;
 
-    let currentArea = '';
+  // 첫 실행: 기본 계정 생성
+  Auth.initAccounts();
 
-    const RUBRIC_COMMON = {
-        'pro': { title: "전공역량 (30점)", max: 30, items: [
-            { score: 8, label: "전공 자격증 일반" }, { score: 7, label: "의무검정/면제 취득" },
-            { score: 5, label: "프로젝트 수업 참여" }, { score: 5, label: "기업체 프로그램 참여" },
-            { score: 10, label: "전국 기능대회 입상" }, { score: 5, label: "지방 기능대회 입상" }
-        ]},
-        'lang': { title: "외국어능력 (5점)", max: 5, items: [
-            { score: 5, label: "영어 우수 (토익 600/오픽 IM2)" }, { score: 3, label: "영어 보통 (토익 300~595)" },
-            { score: 5, label: "일/중 우수 (JPT 600/N2)" }, { score: 3, label: "일/중 보통 (JPT 525/N3)" }
-        ]}
-    };
-    const JOB_CERTS = [
-        { id: 0, label: "컴활/워드 2개", score: 5 }, { id: 1, label: "컴활/워드 1개", score: 3 },
-        { id: 2, label: "한국사 1급", score: 6 }, { id: 3, label: "한국사 2급", score: 4 }
-    ];
-
-    window.renderClassGrid = function() {
-        const grid = document.getElementById('student-grid');
-        grid.innerHTML = "";
-        window.classData.forEach(s => {
-            const div = document.createElement('div');
-            div.className = `student-card ${s.grade !== 'Ready' ? 'done' : ''}`;
-            div.onclick = () => selectStudent(s.id);
-            div.innerHTML = `
-                <div class="grade-badge">${s.grade}</div>
-                <h3 style="margin:0 0 5px 0;">${s.name}</h3>
-                <div style="color:#777; font-size:0.9rem;">${s.id}</div>
-                <div style="color:${s.total > 0 ? '#3498db' : '#ccc'}; font-weight:bold; margin-top:10px;">${s.total}점</div>
-            `;
-            grid.appendChild(div);
-        });
-    };
-    window.saveClassLocal = function() { localStorage.setItem('gmind_class_list_v4', JSON.stringify(window.classData)); };
-    
-    // [관리자: 명렬표 엑셀 업로드]
-    window.handleRosterExcel = function(input) {
-        const file = input.files[0];
-        if(!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const data = new Uint8Array(e.target.result);
-            const wb = XLSX.read(data, {type:'array'});
-            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-            
-            let count = 0;
-            // 예상 컬럼: 학년, 반, 번호, 이름, 학과
-            json.forEach(row => {
-                let grade = row['학년'];
-                let cls = row['반'];
-                let num = row['번호'];
-                let name = row['이름'] || row['성명'];
-                let dept = row['학과'] || '공통';
-
-                if(grade && cls && num && name) {
-                    // 학번 생성 (예: 1학년 3반 5번 -> 1305)
-                    let sid = `${grade}${cls}${String(num).padStart(2, '0')}`;
-                    // 중복 체크 후 추가
-                    if(!window.classData.find(s => s.id === sid)) {
-                        window.classData.push({ id: sid, name: name, dept: dept, total: 0, grade: 'Ready' });
-                        count++;
-                    }
-                }
-            });
-            saveClassLocal();
-            alert(`${count}명의 학생이 명렬표에 추가되었습니다.`);
-        };
-        reader.readAsArrayBuffer(file);
-    };
-
-    // [조회: 상세 체크리스트 렌더링]
-    window.renderLookupView = function(student, data) {
-        document.getElementById('lookup-name').innerText = student.name;
-        document.getElementById('lookup-info').innerText = `(${student.id} / ${student.dept})`;
-        document.getElementById('lookup-total').innerText = student.total;
-        document.getElementById('lookup-grade').innerText = student.grade;
-        
-        // 상세 데이터 파싱
-        let jD = { kor: 5, eng: 5, math: 5, prob: 5, certs: [] };
-        let cD = { mileage: 0, attend: 20, after: 0, readings: [] };
-        let sc = { char: [], pro: [], lang: [] };
-        let fl = { job: {}, char: {}, pro: {}, lang: {}, readings: {} };
-
-        if(data.detailData) {
-            const parsed = JSON.parse(data.detailData);
-            if(parsed.job) jD = parsed.job;
-            if(parsed.char) cD = parsed.char;
-            if(parsed.scores) sc = parsed.scores;
-            if(parsed.files) fl = parsed.files;
-        }
-
-        const container = document.getElementById('lookup-content');
-        container.innerHTML = "";
-
-        // 1. 직업기초능력
-        let jobHtml = `<div class="checklist-group"><div class="group-header">📘 직업기초능력 <span class="group-badge">${data.job||0}점</span></div>`;
-        // 과목
-        jobHtml += `
-            <div class="check-item ${jD.kor<=2 || jD.eng<=2 || jD.math<=2 || jD.prob<=2 ? 'checked' : ''}">
-                <div><span class="check-icon">${jD.kor<=2 || jD.eng<=2 ? '✅' : '⬜'}</span> NCS 과목 등급 (국어:${jD.kor}, 영어:${jD.eng}, 수학:${jD.math}, 해결:${jD.prob})</div>
-                <div class="evidence-tag">최고등급 반영</div>
-            </div>`;
-        // 자격증
-        JOB_CERTS.forEach((c, idx) => {
-            const isDone = jD.certs.includes(idx);
-            jobHtml += `
-                <div class="check-item ${isDone ? 'checked' : ''}">
-                    <div><span class="check-icon">${isDone ? '✅' : '⬜'}</span> ${c.label}</div>
-                    ${isDone && fl.job[idx] ? `<div class="evidence-tag">📎 ${fl.job[idx]}</div>` : ''}
-                </div>`;
-        });
-        jobHtml += `</div>`;
-
-        // 2. 인성능력
-        let charHtml = `<div class="checklist-group"><div class="group-header">🌿 인성능력 <span class="group-badge">${data.char||0}점</span></div>`;
-        charHtml += `
-            <div class="check-item checked">
-                <div><span class="check-icon">✅</span> 그린마일리지 / 출결 / 방과후</div>
-                <div class="evidence-tag">마일리지:${cD.mileage} / 출결:${cD.attend} / 방과후:${cD.after}</div>
-            </div>`;
-        for(let i=0; i<5; i++) {
-            const isDone = cD.readings.includes(i);
-            charHtml += `
-                <div class="check-item ${isDone ? 'checked' : ''}">
-                    <div><span class="check-icon">${isDone ? '✅' : '⬜'}</span> 독서감상문 ${i+1}</div>
-                    ${isDone && fl.readings[i] ? `<div class="evidence-tag">📎 ${fl.readings[i]}</div>` : ''}
-                </div>`;
-        }
-        charHtml += `</div>`;
-
-        // 3. 전공 & 외국어
-        let proHtml = generateLookupSection('🛠️ 전공역량', data.pro, 'pro', RUBRIC_COMMON['pro'].items, sc.pro, fl.pro);
-        let langHtml = generateLookupSection('🌍 외국어', data.lang, 'lang', RUBRIC_COMMON['lang'].items, sc.lang, fl.lang);
-
-        container.innerHTML = jobHtml + charHtml + proHtml + langHtml;
-    };
-
-    function generateLookupSection(title, score, key, items, doneIndices, fileMap) {
-        let html = `<div class="checklist-group"><div class="group-header">${title} <span class="group-badge">${score||0}점</span></div>`;
-        items.forEach((item, idx) => {
-            const isDone = doneIndices.includes(idx);
-            html += `
-                <div class="check-item ${isDone ? 'checked' : ''}">
-                    <div><span class="check-icon">${isDone ? '✅' : '⬜'}</span> ${item.label}</div>
-                    ${isDone && fileMap[idx] ? `<div class="evidence-tag">📎 ${fileMap[idx]}</div>` : ''}
-                </div>`;
-        });
-        html += `</div>`;
-        return html;
-    }
-
-    // [모달/파일 핸들러 등 기존 로직 유지]
-    window.openRubric = function(area) {
-        currentArea = area;
-        const content = document.getElementById('modal-content');
-        if (area === 'job') {
-            let h = `<table class="chk-table"><tr><th>과목 등급</th></tr><tr><td>
-                국어 <select id="i-k" onchange="uJob()">${opts(window.jobDetails.kor)}</select>
-                영어 <select id="i-e" onchange="uJob()">${opts(window.jobDetails.eng)}</select>
-                수학 <select id="i-m" onchange="uJob()">${opts(window.jobDetails.math)}</select>
-                해결 <select id="i-p" onchange="uJob()">${opts(window.jobDetails.prob)}</select>
-                </td></tr></table><table class="chk-table"><tr><th>자격증 (파일첨부)</th></tr>`;
-            JOB_CERTS.forEach((c, i) => {
-                const chk = window.jobDetails.certs.includes(i) ? 'checked' : '';
-                h += `<tr><td><label><input type="checkbox" id="jc-${i}" ${chk} onchange="uJob()"> ${c.label}</label>
-                      <br><label class="file-label">📎 파일<input type="file" onchange="hFile(this,'job',${i})"></label> <span class="file-name" id="fn-job-${i}">${window.fileData.job[i]||''}</span></td></tr>`;
-            });
-            content.innerHTML = h + `</table>`; uJob();
-        } else if (area === 'char') {
-            let h = `<div style="padding:10px; background:#f0f9ff; border-radius:10px; margin-bottom:10px;">
-                <div style="margin-bottom:10px;">🌱 그린마일리지: <input type="number" id="i-mil" value="${window.charDetails.mileage}" min="-10" max="10" onchange="uChar()" style="width:60px;">점</div>
-                <div style="margin-bottom:10px;">📅 출결 (엑셀/입력): <input type="number" id="i-att" value="${window.charDetails.attend}" min="0" max="20" onchange="uChar()" style="width:60px;">점</div>
-                <div>🏫 방과후 (엑셀/입력): <input type="number" id="i-aft" value="${window.charDetails.after}" min="0" max="6" onchange="uChar()" style="width:60px;">점</div></div>
-                <table class="chk-table"><tr><th>독서감상문</th></tr>`;
-            for(let i=0; i<5; i++) {
-                const chk = window.charDetails.readings.includes(i) ? 'checked' : '';
-                h += `<tr><td><label><input type="checkbox" id="rc-${i}" ${chk} onchange="uChar()"> 감상문 ${i+1}</label>
-                      <br><label class="file-label">📎 파일<input type="file" onchange="hFile(this,'readings',${i})"></label> <span class="file-name" id="fn-readings-${i}">${window.fileData.readings[i]||''}</span></td></tr>`;
-            }
-            content.innerHTML = h + `</table>`; uChar();
-        } else {
-            let h = `<table class="chk-table"><tr><th>항목</th></tr>`;
-            RUBRIC_COMMON[area].items.forEach((item, i) => {
-                const chk = window.currentScores[area].includes(i) ? 'checked' : '';
-                h += `<tr><td><label><input type="checkbox" id="chk-${i}" ${chk} onchange="uComm()"> ${item.label}</label>
-                      <br><label class="file-label">📎 증빙<input type="file" onchange="hFile(this,'${area}',${i})"></label> <span class="file-name" id="fn-${area}-${i}">${window.fileData[area][i]||''}</span></td></tr>`;
-            });
-            content.innerHTML = h + `</table>`; uComm();
-        }
-        document.getElementById('rubric-modal').style.display = 'flex';
-    };
-
-    function opts(v) { let s=''; for(let i=1;i<=5;i++) s+=`<option value="${i}" ${i==v?'selected':''}>${i}등급</option>`; return s; }
-    
-    // [점수 계산 및 파일 처리]
-    window.uJob = function() {
-        const k=Number(document.getElementById('i-k').value), e=Number(document.getElementById('i-e').value);
-        const m=Number(document.getElementById('i-m').value), p=Number(document.getElementById('i-p').value);
-        const pts = [0, 7, 6, 5, 3, 2];
-        const maxS = Math.max(pts[k], pts[e], pts[m], pts[p]);
-        let cS = 0;
-        JOB_CERTS.forEach((c,i) => { if(document.getElementById(`jc-${i}`).checked) cS += c.score; });
-        document.getElementById('modal-score').innerText = Math.min(30, maxS + cS);
-    };
-    window.uChar = function() {
-        const m=Number(document.getElementById('i-mil').value), a=Number(document.getElementById('i-att').value), f=Number(document.getElementById('i-aft').value);
-        let r=0; for(let i=0;i<5;i++) if(document.getElementById(`rc-${i}`).checked) r++;
-        document.getElementById('modal-score').innerText = m+a+f+r; 
-    };
-    window.uComm = function() {
-        let t=0; RUBRIC_COMMON[currentArea].items.forEach((it,i) => { if(document.getElementById(`chk-${i}`).checked) t+=it.score; });
-        document.getElementById('modal-score').innerText = Math.min(RUBRIC_COMMON[currentArea].max, t);
-    };
-    window.hFile = function(inp, cat, idx) {
-        if(inp.files[0]) {
-            const n = inp.files[0].name;
-            if(cat==='readings') window.fileData.readings[idx]=n; else window.fileData[cat][idx]=n;
-            document.getElementById(`fn-${cat==='readings'?'readings':cat}-${idx}`).innerText = n;
-            const chkId = cat==='readings'?`rc-${idx}`:(cat==='job'?`jc-${idx}`:`chk-${idx}`);
-            if(document.getElementById(chkId)) document.getElementById(chkId).checked = true;
-            if(cat==='job') uJob(); else if(cat==='readings') uChar(); else uComm();
-        }
-    }
-    window.closeRubric = function() {
-        const s = Number(document.getElementById('modal-score').innerText);
-        if(currentArea==='job') {
-            window.jobDetails.kor=document.getElementById('i-k').value; window.jobDetails.eng=document.getElementById('i-e').value;
-            window.jobDetails.math=document.getElementById('i-m').value; window.jobDetails.prob=document.getElementById('i-p').value;
-            window.jobDetails.certs=[]; JOB_CERTS.forEach((c,i)=>{ if(document.getElementById(`jc-${i}`).checked) window.jobDetails.certs.push(i); });
-            document.getElementById('sc-job').value = s;
-        } else if(currentArea==='char') {
-            window.charDetails.mileage=Number(document.getElementById('i-mil').value);
-            window.charDetails.attend=Number(document.getElementById('i-att').value);
-            window.charDetails.after=Number(document.getElementById('i-aft').value);
-            window.charDetails.readings=[]; for(let i=0;i<5;i++) if(document.getElementById(`rc-${i}`).checked) window.charDetails.readings.push(i);
-            document.getElementById('sc-char').value = s > 35 ? 35 : s;
-        } else {
-            window.currentScores[currentArea]=[];
-            RUBRIC_COMMON[currentArea].items.forEach((it,i)=>{ if(document.getElementById(`chk-${i}`).checked) window.currentScores[currentArea].push(i); });
-            document.getElementById(`sc-${currentArea}`).value = s;
-        }
-        window.calc();
-        document.getElementById('rubric-modal').style.display='none';
-    };
-    window.calc = function() {
-        const j=Number(document.getElementById('sc-job').value), c=Number(document.getElementById('sc-char').value);
-        const p=Number(document.getElementById('sc-pro').value), l=Number(document.getElementById('sc-lang').value);
-        const t = j+c+p+l;
-        document.getElementById('disp-total').innerText = t;
-        let g="Ready"; if(t>=90)g="G"; else if(t>=80)g="S"; else if(t>=70)g="A"; else if(t>0)g="B";
-        document.getElementById('disp-grade').innerText = g;
-    };
-    window.clearAllData = function() {
-        if(confirm("정말 모든 데이터를 삭제하시겠습니까?")) {
-            localStorage.clear();
-            alert("초기화되었습니다.");
-            location.reload();
-        }
-    }
+  // 자동 로그인 시도
+  if (!Auth.tryAutoLogin()) {
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+})();
 </script>
 </body>
 </html>
