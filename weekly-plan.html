@@ -315,8 +315,6 @@ var CLIENT_ID = '243121397435-jlu52hqe8or79msoqj5qkrpuop9o1f0d.apps.googleuserco
 var SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events';
 var SCHOOL_CALENDAR_NAME = '경북기계금속고';
 var CALENDAR_ID = null;
-var PUBLIC_CALENDAR_EMBED_URL = 'https://calendar.google.com/calendar/embed?src=r100000729%40sc.gyo6.net&ctz=Asia%2FSeoul';
-var IS_MOBILE_READONLY = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
 
 var GOOGLE_SCRIPT_TIMEOUT_MS = 7000;
 var CACHE_KEY_PREFIX = 'weekly-cache-v3:';
@@ -327,8 +325,6 @@ var CACHE_TTL_MS = 5 * 60 * 1000;
 // ═══════════════════════════════════════════════════════════
 var state = {
   loggedIn: false,
-  publicMode: true,
-  isMobileReadonly: IS_MOBILE_READONLY,
   loading: true,
   accessToken: null,
   events: [],
@@ -767,89 +763,6 @@ function showToast(msg) {
   setTimeout(function(){ state.toast = null; render(); }, 2500);
 }
 
-function enterAdminEditMode() {
-  if (state.isMobileReadonly) {
-    showToast('휴대폰에서는 읽기 전용입니다. PC에서 수정 모드를 사용하세요.');
-    return;
-  }
-
-  state.publicMode = false;
-  state.loading = true;
-  render();
-
-  if (state.loggedIn) {
-    state.loading = false;
-    render();
-    return;
-  }
-
-  if (state.demo) {
-    state.loggedIn = true;
-    state.loading = false;
-    loadDemoEvents();
-    render();
-    return;
-  }
-
-  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2 || !tokenClient) {
-    state.loading = false;
-    state.publicMode = true;
-    render();
-    showToast('로그인 스크립트를 불러오지 못했습니다. PC에서 새로고침 후 다시 시도하세요.');
-    return;
-  }
-
-  doLogin();
-}
-
-function exitToReadMode() {
-  state.publicMode = true;
-  state.showForm = false;
-  state.showMgr = false;
-  state.editEv = null;
-  render();
-}
-
-function renderPublicCalendar() {
-  var wrap = h('div', {className:'public-wrap'});
-  var hd = h('div', {className:'header'});
-  var left = h('div');
-  left.appendChild(h('h1', null, '경북기계금속고등학교'));
-  left.appendChild(h('small', null, state.isMobileReadonly ? '주간 계획 · 읽기 전용' : '주간 계획 · 공개 열람'));
-  hd.appendChild(left);
-
-  var right = h('div', {style:{display:'flex',gap:'6px',flexWrap:'wrap'}});
-  right.appendChild(h('button', {
-    className:'btn',
-    onClick:function(){ window.open(PUBLIC_CALENDAR_EMBED_URL, '_blank'); }
-  }, '새 창으로 보기'));
-
-  if (!state.isMobileReadonly) {
-    right.appendChild(h('button', {
-      className:'btn btn-primary',
-      onClick:enterAdminEditMode
-    }, '관리자 수정 모드'));
-  } else {
-    right.appendChild(h('span', {className:'tag'}, '휴대폰 읽기 전용'));
-  }
-
-  hd.appendChild(right);
-  wrap.appendChild(hd);
-
-  wrap.appendChild(h('div', {className:'card', style:{padding:'12px', marginBottom:'10px', color:'var(--tx2)'}},
-    state.isMobileReadonly
-      ? '휴대폰에서는 읽기 전용으로만 열립니다. 수정은 PC에서 관리자 수정 모드를 눌러 진행하세요.'
-      : '일반 선생님은 그대로 열람만 하시면 됩니다. 관리자만 수정 모드를 눌러 구글 로그인 후 일정 수정이 가능합니다.'
-  ));
-
-  wrap.appendChild(h('iframe', {
-    src: PUBLIC_CALENDAR_EMBED_URL,
-    style:{width:'100%', height:'calc(100vh - 210px)', minHeight:'680px', border:'0', borderRadius:'16px', background:'#fff'}
-  }));
-
-  return wrap;
-}
-
 // ═══════════════════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════════════════
@@ -882,12 +795,6 @@ function h(tag, attrs, children) {
 function render() {
   var app = document.getElementById('app');
   app.innerHTML = '';
-
-  if (state.publicMode) {
-    app.appendChild(renderPublicCalendar());
-    if (state.toast) app.appendChild(h('div', {className:'toast'}, state.toast));
-    return;
-  }
 
   if (!state.loggedIn) {
     app.appendChild(renderLogin());
@@ -936,11 +843,6 @@ function renderHeader() {
   hd.appendChild(left);
 
   var right = h('div', {style:{display:'flex',gap:'6px',flexWrap:'wrap'}});
-  right.appendChild(h('button', {
-    className:'btn',
-    onClick:exitToReadMode
-  }, '읽기 모드'));
-
   right.appendChild(h('button', {
     className:'btn',
     onClick:function(){ state.showMgr = true; render(); }
