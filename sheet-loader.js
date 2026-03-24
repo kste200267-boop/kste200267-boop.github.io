@@ -56,8 +56,15 @@ var SheetLoader=(function(){
 
   // 학급 시간표 추출 (행5~22, B열=반이름)
   // 열 매핑: C~I=월1~7, J~P=화1~7, Q~V=수1~6, W~AB=목1~6, AC~AH=금1~6
-  var CLASS_MAP={'용접1':'1용1','용접2':'1용2','기계1':'1기1','기계2':'1기2','금형1':'1금1','금형2':'1금2'};
-  var DAY_COLS={월:[2,3,4,5,6,7,8],화:[9,10,11,12,13,14,15],수:[16,17,18,19,20,21],목:[22,23,24,25,26,27],금:[28,29,30,31,32,33]};
+ // 열 매핑: C~I=월1~7, J~P=화1~7, Q~W=수1~7, X~AD=목1~7, AE~AK=금1~7
+var CLASS_MAP={'용접1':'1용1','용접2':'1용2','기계1':'1기1','기계2':'1기2','금형1':'1금1','금형2':'1금2'};
+var DAY_COLS={
+  월:[2,3,4,5,6,7,8],
+  화:[9,10,11,12,13,14,15],
+  수:[16,17,18,19,20,21,22],
+  목:[23,24,25,26,27,28,29],
+  금:[30,31,32,33,34,35,36]
+};
 function cleanTeacherSlot(v){
   v=(v||'').replace(/\n/g,'').trim();
   if(!v) return null;
@@ -73,7 +80,7 @@ function cleanTeacherSlot(v){
   // 그 외는 일단 버림
   return null;
 }
- function extractClasses(rows){
+function extractClasses(rows){
   var classes={};
   var teacherStart = rows.length;
 
@@ -93,31 +100,31 @@ function cleanTeacherSlot(v){
     var mapped=CLASS_MAP[className];
     if(!mapped) continue;
 
-    // 이미 읽은 반이면 덮어쓰지 않음
     if(classes[mapped]) continue;
 
     var cls={};
-for(var day in DAY_COLS){
-  var cols=DAY_COLS[day];
-  var periods=[];
-  var lastValue=null;
 
-  for(var j=0;j<cols.length;j++){
-    var ci=cols[j];
-    var v=(ci<row.length)?row[ci]:'';
-    v=(v||'').replace(/\n/g,'').trim();
+    for(var day in DAY_COLS){
+      var cols=DAY_COLS[day];
+      var periods=[];
+      var lastValue=null;
 
-    // 병합 셀 때문에 빈칸이면 바로 이전 값으로 채움
-    if(v){
-      lastValue=v;
-      periods.push(v);
-    }else{
-      periods.push(lastValue);
+      for(var j=0;j<cols.length;j++){
+        var ci=cols[j];
+        var v=(ci<row.length)?row[ci]:'';
+        v=(v||'').replace(/\n/g,'').trim();
+
+        // 병합 셀 보정
+        if(v){
+          lastValue=v;
+          periods.push(v);
+        }else{
+          periods.push(lastValue);
+        }
+      }
+
+      cls[day]=periods;
     }
-  }
-
-  cls[day]=periods;
-}
 
     classes[mapped]=cls;
   }
@@ -178,10 +185,10 @@ function extractTeachers(rows){
     var hours=parseInt(row[1],10)||0;
     var sched=[];
 
-    for(var j=2;j<34;j++){
-      var raw=(j<row.length)?row[j]:'';
-      sched.push(cleanTeacherSlot(raw));
-    }
+  for(var j=2;j<37;j++){
+  var raw=(j<row.length)?row[j]:'';
+  sched.push(cleanTeacherSlot(raw));
+}
 
     teachers[name]={h:hours,s:sched};
   }
