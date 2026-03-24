@@ -2,11 +2,25 @@
 var App=(function(){
   var user=null,admin=false;
   return{
-    init:function(name,isA){user=name;admin=isA;Engine.rebuild();
-      document.getElementById('tName').textContent=name;
-      document.getElementById('tSub').textContent=Engine.TS()[name]+(Engine.TD()[name].h?' · '+Engine.TD()[name].h+'시수':'');
-      Router.buildNav();Router.go('home');
-    },
+init:function(name,isA){
+  user=name;
+  admin=isA;
+
+  Engine.rebuild();
+
+  document.getElementById('tName').textContent=name;
+  document.getElementById('tSub').textContent=
+    Engine.TS()[name] + (Engine.TD()[name].h ? ' · ' + Engine.TD()[name].h + '시수' : '');
+
+  Router.buildNav();
+
+  requestAnimationFrame(function(){
+    Router.go('home');
+    requestAnimationFrame(function(){
+      window.dispatchEvent(new Event('resize'));
+    });
+  });
+},
     getUser:function(){return user},isAdmin:function(){return admin},
     setUser:function(n,a){user=n;admin=a}
   };
