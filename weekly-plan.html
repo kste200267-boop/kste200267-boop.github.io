@@ -132,6 +132,17 @@ input,select,textarea{font-family:var(--font)}
 }
 
 @media print{
+  .today{
+  background:transparent !important;
+}
+  .day-head.today{
+  background:transparent !important;
+}
+
+.day-head.today .day-name,
+.day-head.today .day-num{
+  color:#000 !important;
+}
 .print-head{
   display:block !important;
   text-align:center;
@@ -1033,19 +1044,19 @@ function expandEventsForWeek(events, weekStart) {
 
     while (cur <= last) {
       if (cur >= weekStart && cur <= weekEnd) {
-        expanded.push({
-          id: ev.id + '_' + cur.toISOString().slice(0,10),
-          originId: ev.id,
-          title: ev.title,
-          description: ev.description,
-          location: ev.location,
-          start: new Date(cur),
-          end: new Date(cur),
-          isAllDay: ev.isAllDay,
-          department: ev.department,
-          departmentColor: ev.departmentColor,
-          isContinued: cur.getTime() > startDay.getTime()
-        });
+  expanded.push({
+  id: ev.id + '_' + cur.toISOString().slice(0,10),
+  originId: ev.id,
+  title: ev.title,
+  description: ev.description,
+  location: ev.location,
+  start: ev.isAllDay ? new Date(cur) : new Date(ev.start),
+  end: ev.isAllDay ? new Date(cur) : new Date(ev.end),
+  isAllDay: ev.isAllDay,
+  department: ev.department,
+  departmentColor: ev.departmentColor,
+  isContinued: cur.getTime() > startDay.getTime()
+});
       }
       cur.setDate(cur.getDate() + 1);
     }
