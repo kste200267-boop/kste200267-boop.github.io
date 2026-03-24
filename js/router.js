@@ -45,12 +45,34 @@ var Router=(function(){
       h+='<div class="s-item'+(t.id===cur?' on':'')+'" onclick="Router.go(\''+t.id+'\')">'+t.icon+' '+t.label+'</div>';}
     document.getElementById('sidebar').innerHTML=h;
   }
-  function go(id){
-    cur=id;buildNav();
-    document.getElementById('content').innerHTML='<div class="page-wrap" id="pg"></div>';
-    var pages={home:PageHome,my:PageMy,full:PageFull,swap:PageSwap,history:PageHistory,weekly:PageWeekly,meal:PageMeal,schedule:PageSchedule,tasks:PageTasks,admin:PageAdmin,profile:PageProfile};
-    if(pages[id])pages[id].render();
-    document.getElementById('content').scrollTop=0;
-  }
+function go(id){
+  cur=id;
+  buildNav();
+
+  var content = document.getElementById('content');
+  content.innerHTML = '<div class="page-wrap" id="pg"></div>';
+
+  var pages = {
+    home:PageHome,
+    my:PageMy,
+    full:PageFull,
+    swap:PageSwap,
+    history:PageHistory,
+    weekly:PageWeekly,
+    meal:PageMeal,
+    schedule:PageSchedule,
+    tasks:PageTasks,
+    admin:PageAdmin,
+    profile:PageProfile
+  };
+
+  if(pages[id]) pages[id].render();
+
+  content.scrollTop = 0;
+
+  requestAnimationFrame(function(){
+    window.dispatchEvent(new Event('resize'));
+  });
+}
   return{buildNav:buildNav,go:go};
 })();
