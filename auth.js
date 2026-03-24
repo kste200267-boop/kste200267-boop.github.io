@@ -1,10 +1,11 @@
-// js/auth.js — 인증
+// js/auth.js — 인증 (localStorage 기반 영구 로그인 유지)
 var Auth=(function(){
+  var SESSION_KEY='gm-session-v2'; // v2: localStorage 기반
+
   function initAccounts(){
     if(Store.get('accounts',null)) return;
     var acc={};
-    // TD_A가 로드됐으면 교사 목록으로 초기화, 없으면 기본 관리자만
-    var src = (typeof TD_A!=='undefined' && Object.keys(TD_A).length) ? TD_A : {};
+    var src=(typeof TD_A!=='undefined'&&Object.keys(TD_A).length)?TD_A:{};
     for(var name in src) acc[name]={id:name,pw:'1234',role:'user'};
     acc['김스데반']={id:'김스데반',pw:'1120',role:'admin'};
     Store.set('accounts',acc);
@@ -12,6 +13,22 @@ var Auth=(function(){
 
   function getAccounts(){return Store.get('accounts',{})}
   function saveAccounts(a){Store.set('accounts',a)}
+
+  // 세션 저장 (localStorage → 앱 닫아도 유지)
+  function saveSession(name,role){
+    try{localStorage.setItem(SESSION_KEY,JSON.stringify({name:name,role:role,ts:Date.now()}))}catch(e){}
+  }
+  function loadSession(){
+    try{
+      var raw=localStorage.getItem(SESSION_KEY);
+      return raw?JSON.parse(raw):null;
+    }catch(e){return null}
+  }
+  function clearSession(){
+    try{localStorage.removeItem(SESSION_KEY)}catch(e){}
+    // 구버전 세션도 제거
+    try{sessionStorage.removeItem('gm-session')}catch(e){}
+  }
 
   function login(){
     var id=document.getElementById('loginId').value.trim();
@@ -23,55 +40,55 @@ var Auth=(function(){
     if(!found){err.textContent='존재하지 않는 아이디입니다';return}
     if(found.pw!==pw){err.textContent='비밀번호가 틀렸습니다';return}
     err.textContent='';
-
-    sessionStorage.setItem('gm-session', JSON.stringify({
-      name: found._key,
-      role: found.role
-    }));
-    showApp(found._key, found.role==='admin');
+    saveSession(found._key,found.role);
+    showApp(found._key,found.role==='admin');
   }
 
   function logout(){
-    sessionStorage.removeItem('gm-session');
+    clearSession();
     location.reload();
   }
 
   function tryAutoLogin(){
     try{
-      var raw=sessionStorage.getItem('gm-session');
-      var sess=raw?JSON.parse(raw):null;
+      // v2 localStorage 세션 먼저
+      var sess=loadSession();
+      // 구버전 sessionStorage 폴백
+      if(!sess){
+        var raw=sessionStorage.getItem('gm-session');
+        if(raw){
+          sess=JSON.parse(raw);
+          // 구버전이면 localStorage로 마이그레이션
+          if(sess&&sess.name) saveSession(sess.name,sess.role);
+        }
+      }
       if(!sess||!sess.name) return false;
 
-      // TD_A 로드 여부 확인 - 없으면 로그인 불가
-      var tdLoaded=(typeof TD_A!=='undefined')&&Object.keys(TD_A||{}).length>0;
       var acc=getAccounts();
+      var tdLoaded=(typeof TD_A!=='undefined')&&Object.keys(TD_A||{}).length>0;
 
-      // 계정이 있거나 TD_A에 있는 교사면 자동 로그인
-      if(acc[sess.name] || (tdLoaded && TD_A[sess.name])){
-        showApp(sess.name, sess.role==='admin');
+      if(acc[sess.name]||(tdLoaded&&TD_A[sess.name])){
+        showApp(sess.name,sess.role==='admin');
         return true;
       }
     }catch(e){
-      console.error('auto login parse error:',e);
-      sessionStorage.removeItem('gm-session');
+      console.error('auto login error:',e);
+      clearSession();
     }
     return false;
   }
 
-  function showApp(name, isAdmin){
+  function showApp(name,isAdmin){
     var loginScreen=document.getElementById('loginScreen');
     var shell=document.getElementById('shell');
     if(loginScreen) loginScreen.style.display='none';
     if(shell) shell.style.display='flex';
-
-    // App.init 전에 TD가 로드됐는지 확인
     try{
-      App.init(name, isAdmin);
+      App.init(name,isAdmin);
     }catch(e){
       console.error('App.init error:',e);
-      // 화면이라도 보여주기 위해 강제 재시도
       setTimeout(function(){
-        try{App.init(name,isAdmin)}catch(e2){console.error('retry init failed:',e2)}
+        try{App.init(name,isAdmin)}catch(e2){console.error('retry failed:',e2)}
       },500);
     }
   }
@@ -86,14 +103,11 @@ var Auth=(function(){
     changePw:function(){
       var user=App.getUser();if(!user)return;
       var acc=getAccounts();if(!acc[user])return;
-      var cur=prompt('현재 비밀번호:');
-      if(cur===null)return;
+      var cur=prompt('현재 비밀번호:');if(cur===null)return;
       if(cur!==acc[user].pw){toast('현재 비밀번호가 틀립니다');return}
-      var np=prompt('새 비밀번호:');
-      if(!np||np.length<1){toast('비밀번호를 입력하세요');return}
-      var np2=prompt('새 비밀번호 확인:');
-      if(np!==np2){toast('비밀번호가 일치하지 않습니다');return}
-      acc[user].pw=np;saveAccounts(acc);toast('비밀번호가 변경되었습니다');
+      var np=prompt('새 비밀번호:');if(!np){toast('비밀번호를 입력하세요');return}
+      var np2=prompt('새 비밀번호 확인:');if(np!==np2){toast('비밀번호가 일치하지 않습니다');return}
+      acc[user].pw=np;saveAccounts(acc);toast('비밀번호 변경됨');
     }
   };
 })();
