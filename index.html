@@ -27,15 +27,11 @@
   border-radius:50%;animation:spin .8s linear infinite;margin-top:4px;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
-
 /* PWA 설치 배너 */
 #pwaBar{
-  display:none;
-  position:fixed;bottom:0;left:0;right:0;z-index:8000;
-  background:#fff;border-top:1px solid #e0e0e0;
-  box-shadow:0 -2px 12px rgba(0,0,0,.1);
-  padding:12px 16px;
-  font-family:'Noto Sans KR',system-ui,sans-serif;
+  display:none;position:fixed;bottom:0;left:0;right:0;z-index:8000;
+  background:#fff;border-top:1px solid #e0e0e0;box-shadow:0 -2px 12px rgba(0,0,0,.1);
+  padding:12px 16px;font-family:'Noto Sans KR',system-ui,sans-serif;
   animation:slideUp .3s ease;
 }
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
@@ -45,26 +41,14 @@
 .pwa-text{flex:1;min-width:0}
 .pwa-title{font-weight:700;font-size:.92em;color:#202124}
 .pwa-desc{font-size:.78em;color:#5f6368;margin-top:1px;word-break:keep-all}
-.pwa-btn-install{
-  padding:8px 16px;border-radius:8px;border:none;
-  background:#1a73e8;color:#fff;font-size:.83em;font-weight:600;
-  cursor:pointer;white-space:nowrap;flex-shrink:0;
-  font-family:'Noto Sans KR',system-ui,sans-serif;
-}
+.pwa-btn-install{padding:8px 16px;border-radius:8px;border:none;background:#1a73e8;color:#fff;font-size:.83em;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Noto Sans KR',system-ui,sans-serif}
 .pwa-btn-install:active{opacity:.85}
-.pwa-btn-close{
-  background:none;border:none;font-size:1.3em;cursor:pointer;
-  color:#9aa0a6;padding:0 2px;flex-shrink:0;line-height:1;
-}
-
-/* 아이폰 Safari 전용 말풍선 안내 */
+.pwa-btn-close{background:none;border:none;font-size:1.3em;cursor:pointer;color:#9aa0a6;padding:0 2px;flex-shrink:0;line-height:1}
+/* iOS 안내 */
 #iosGuide{
-  display:none;
-  position:fixed;bottom:0;left:0;right:0;z-index:8000;
-  background:#1c1c1e;color:#fff;
-  border-radius:16px 16px 0 0;
-  padding:20px 20px 32px;
-  font-family:'Noto Sans KR',system-ui,sans-serif;
+  display:none;position:fixed;bottom:0;left:0;right:0;z-index:8000;
+  background:#1c1c1e;color:#fff;border-radius:16px 16px 0 0;
+  padding:20px 20px 32px;font-family:'Noto Sans KR',system-ui,sans-serif;
   animation:slideUp .3s ease;
 }
 #iosGuide.show{display:block}
@@ -73,22 +57,13 @@
 .ios-title{font-weight:700;font-size:.95em;margin-bottom:12px;text-align:center}
 .ios-steps{display:flex;flex-direction:column;gap:10px}
 .ios-step{display:flex;align-items:center;gap:10px;font-size:.84em;color:rgba(255,255,255,.85)}
-.ios-step-num{
-  width:24px;height:24px;border-radius:50%;background:#1a73e8;
-  font-size:.75em;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;
-}
-.ios-step-icon{font-size:1.1em;flex-shrink:0}
-.ios-close{
-  margin-top:16px;width:100%;padding:12px;border-radius:10px;
-  border:none;background:rgba(255,255,255,.15);color:#fff;
-  font-size:.88em;font-weight:600;cursor:pointer;
-  font-family:'Noto Sans KR',system-ui,sans-serif;
-}
+.ios-step-num{width:24px;height:24px;border-radius:50%;background:#1a73e8;font-size:.75em;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ios-close{margin-top:16px;width:100%;padding:12px;border-radius:10px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:.88em;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',system-ui,sans-serif}
 </style>
 </head>
 <body>
 
-<!-- 초기 로딩 -->
+<!-- 초기 로딩 스피너 -->
 <div id="initScreen">
   <div class="logo">🏫</div>
   <div class="title">경북기계금속고등학교</div>
@@ -133,7 +108,7 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- PWA 설치 배너 (크롬/엣지/웨일/삼성/안드로이드) -->
+<!-- PWA 설치 배너 -->
 <div id="pwaBar">
   <div class="pwa-inner">
     <div class="pwa-icon">🏫</div>
@@ -141,38 +116,26 @@
       <div class="pwa-title" id="pwaTitle">홈 화면에 추가</div>
       <div class="pwa-desc" id="pwaDesc">앱처럼 빠르게 접근할 수 있습니다</div>
     </div>
-    <button class="pwa-btn-install" id="pwaInstallBtnBar" onclick="PWAInstall.trigger()">설치</button>
-    <button class="pwa-btn-close" onclick="PWAInstall.dismiss()" title="닫기">✕</button>
+    <button class="pwa-btn-install" onclick="PWAInstall.trigger()">설치</button>
+    <button class="pwa-btn-close" onclick="PWAInstall.dismiss()">✕</button>
   </div>
 </div>
 
-<!-- iOS Safari 전용 안내 -->
+<!-- iOS Safari 안내 -->
 <div id="iosGuide">
   <div class="ios-inner">
     <div class="ios-handle"></div>
     <div class="ios-title">📲 홈 화면에 추가하기</div>
     <div class="ios-steps">
-      <div class="ios-step">
-        <div class="ios-step-num">1</div>
-        <div class="ios-step-icon">⬆️</div>
-        <div>하단 가운데 <b>공유 버튼</b>을 탭하세요</div>
-      </div>
-      <div class="ios-step">
-        <div class="ios-step-num">2</div>
-        <div class="ios-step-icon">➕</div>
-        <div><b>"홈 화면에 추가"</b>를 선택하세요</div>
-      </div>
-      <div class="ios-step">
-        <div class="ios-step-num">3</div>
-        <div class="ios-step-icon">✅</div>
-        <div>오른쪽 위 <b>"추가"</b>를 탭하면 완료!</div>
-      </div>
+      <div class="ios-step"><div class="ios-step-num">1</div><div>하단 가운데 <b>공유 버튼 ⬆️</b>을 탭하세요</div></div>
+      <div class="ios-step"><div class="ios-step-num">2</div><div><b>"홈 화면에 추가 ➕"</b>를 선택하세요</div></div>
+      <div class="ios-step"><div class="ios-step-num">3</div><div>오른쪽 위 <b>"추가"</b>를 탭하면 완료!</div></div>
     </div>
     <button class="ios-close" onclick="PWAInstall.dismissIos()">확인</button>
   </div>
 </div>
 
-<!-- Firebase -->
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <!-- 데이터 -->
@@ -199,14 +162,13 @@
 <script src="pages/profile.js"></script>
 
 <script>
-// ═══════════════════════════════════════════
+// ═══════════════════
 // PWA 설치 모듈
-// ═══════════════════════════════════════════
+// ═══════════════════
 var PWAInstall=(function(){
-  var deferredPrompt=null; // beforeinstallprompt 이벤트 저장
+  var deferredPrompt=null;
   var DISMISS_KEY='pwa-dismissed-v1';
 
-  // 환경 감지
   function detect(){
     var ua=navigator.userAgent;
     var env={
@@ -214,142 +176,78 @@ var PWAInstall=(function(){
       isAndroid:/Android/.test(ua),
       isSamsung:/SamsungBrowser/.test(ua),
       isWhale:/Whale/.test(ua),
-      isChrome:/Chrome/.test(ua)&&!/Edg|OPR|Whale|SamsungBrowser/.test(ua),
       isEdge:/Edg\//.test(ua),
+      isChrome:/Chrome/.test(ua)&&!/Edg|OPR|Whale|SamsungBrowser/.test(ua),
       isSafari:/Safari/.test(ua)&&!/Chrome|CriOS/.test(ua),
-      isMobile:/Mobi|Android|iPhone|iPad/.test(ua),
       isStandalone:(window.navigator.standalone===true)||window.matchMedia('(display-mode: standalone)').matches
     };
-    // 기기 이름
-    if(env.isIos){
-      if(/iPad/.test(ua)) env.device='아이패드';
-      else env.device='아이폰';
-    }else if(env.isSamsung||env.isAndroid){
-      env.device='갤럭시(안드로이드)';
-    }else{
-      env.device='PC';
-    }
-    // 브라우저 이름
-    if(env.isWhale) env.browser='웨일';
-    else if(env.isEdge) env.browser='엣지';
-    else if(env.isSamsung) env.browser='삼성 인터넷';
-    else if(env.isChrome) env.browser='크롬';
-    else if(env.isSafari) env.browser='Safari';
-    else env.browser='브라우저';
-
+    env.device=env.isIos?(/iPad/.test(ua)?'아이패드':'아이폰'):(env.isAndroid?'갤럭시(안드로이드)':'PC');
+    env.browser=env.isWhale?'웨일':env.isEdge?'엣지':env.isSamsung?'삼성 인터넷':env.isChrome?'크롬':env.isSafari?'Safari':'브라우저';
     return env;
   }
 
-  // beforeinstallprompt 캐치 (크롬/엣지/웨일/삼성/안드로이드)
   window.addEventListener('beforeinstallprompt',function(e){
     e.preventDefault();
     deferredPrompt=e;
-    // 이미 닫았으면 안 띄움
-    if(localStorage.getItem(DISMISS_KEY)) return;
-    // 로그인 후에 배너 표시 (약간 딜레이)
+    if(localStorage.getItem(DISMISS_KEY))return;
     setTimeout(showBanner,1500);
   });
-
-  // 설치 완료 감지
   window.addEventListener('appinstalled',function(){
-    hideBanner();
-    hideIosGuide();
+    hideBanner();document.getElementById('iosGuide').classList.remove('show');
     deferredPrompt=null;
+    var btn=document.getElementById('pwaInstallBtn');if(btn)btn.style.display='none';
     toast('앱이 설치되었습니다! 🎉');
   });
 
   function showBanner(){
     var env=detect();
-    if(env.isStandalone) return; // 이미 설치됨
-
-    var bar=document.getElementById('pwaBar');
-    var title=document.getElementById('pwaTitle');
-    var desc=document.getElementById('pwaDesc');
-    if(!bar) return;
-
-    title.textContent='📲 '+env.device+'에 앱 설치';
-    desc.textContent=env.browser+'에서 홈 화면에 추가하면 앱처럼 빠르게 접근 가능합니다';
+    if(env.isStandalone)return;
+    var bar=document.getElementById('pwaBar');if(!bar)return;
+    document.getElementById('pwaTitle').textContent='📲 '+env.device+'에 앱 설치';
+    document.getElementById('pwaDesc').textContent=env.browser+'에서 홈 화면에 추가하면 앱처럼 빠르게 접근 가능합니다';
     bar.classList.add('show');
-
-    // 상단 설치 버튼도 표시
-    var btn=document.getElementById('pwaInstallBtn');
-    if(btn) btn.style.display='';
+    var btn=document.getElementById('pwaInstallBtn');if(btn)btn.style.display='';
   }
+  function hideBanner(){var bar=document.getElementById('pwaBar');if(bar)bar.classList.remove('show')}
 
-  function hideBanner(){
-    var bar=document.getElementById('pwaBar');
-    if(bar) bar.classList.remove('show');
-  }
-
-  function hideIosGuide(){
-    var guide=document.getElementById('iosGuide');
-    if(guide) guide.classList.remove('show');
-  }
-
-  // 설치 버튼 클릭
   function trigger(){
     var env=detect();
     if(env.isStandalone){toast('이미 설치되어 있습니다');return}
-
     if(deferredPrompt){
-      // 크롬/엣지/웨일/삼성: 네이티브 설치 프롬프트
       deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(function(result){
-        if(result.outcome==='accepted'){
-          toast('설치 완료! 홈 화면을 확인하세요 🎉');
-        }
-        deferredPrompt=null;
-        hideBanner();
-        var btn=document.getElementById('pwaInstallBtn');
-        if(btn) btn.style.display='none';
+      deferredPrompt.userChoice.then(function(r){
+        if(r.outcome==='accepted')toast('설치 완료! 홈 화면을 확인하세요 🎉');
+        deferredPrompt=null;hideBanner();
+        var btn=document.getElementById('pwaInstallBtn');if(btn)btn.style.display='none';
       });
     }else if(env.isIos&&env.isSafari){
-      // 아이폰 Safari: 안내 패널
       hideBanner();
-      var guide=document.getElementById('iosGuide');
-      if(guide) guide.classList.add('show');
+      document.getElementById('iosGuide').classList.add('show');
     }else{
-      // 그 외: 안내 토스트
-      toast('주소창 오른쪽 ⊕ 아이콘 또는 메뉴에서 "설치" / "홈 화면에 추가"를 선택하세요');
+      toast('주소창 오른쪽 설치 아이콘 또는 메뉴 → "홈 화면에 추가"를 선택하세요');
     }
   }
 
-  function dismiss(){
-    localStorage.setItem(DISMISS_KEY,'1');
-    hideBanner();
-    var btn=document.getElementById('pwaInstallBtn');
-    if(btn) btn.style.display='none';
-  }
-
-  function dismissIos(){
-    localStorage.setItem(DISMISS_KEY,'1');
-    hideIosGuide();
-  }
-
-  // 로그인 후 환경에 따라 자동 체크
   function checkAfterLogin(){
     var env=detect();
-    if(env.isStandalone) return; // 이미 앱으로 실행 중
-    if(localStorage.getItem(DISMISS_KEY)) return; // 이전에 닫음
-
+    if(env.isStandalone||localStorage.getItem(DISMISS_KEY))return;
     if(env.isIos&&env.isSafari){
-      // 아이폰 Safari: 배너 없음, 상단 버튼만
-      var btn=document.getElementById('pwaInstallBtn');
-      if(btn) btn.style.display='';
+      var btn=document.getElementById('pwaInstallBtn');if(btn)btn.style.display='';
     }
-    // 크롬계열은 beforeinstallprompt 이벤트가 오면 자동으로 배너 뜸
-    // 이미 deferredPrompt 있으면 바로 배너
-    if(deferredPrompt&&!localStorage.getItem(DISMISS_KEY)){
-      setTimeout(showBanner,800);
-    }
+    if(deferredPrompt)setTimeout(showBanner,800);
   }
 
-  return{trigger:trigger,dismiss:dismiss,dismissIos:dismissIos,checkAfterLogin:checkAfterLogin,detect:detect};
+  return{
+    trigger:trigger,
+    dismiss:function(){localStorage.setItem(DISMISS_KEY,'1');hideBanner();var btn=document.getElementById('pwaInstallBtn');if(btn)btn.style.display='none'},
+    dismissIos:function(){localStorage.setItem(DISMISS_KEY,'1');document.getElementById('iosGuide').classList.remove('show')},
+    checkAfterLogin:checkAfterLogin
+  };
 })();
 
-// ═══════════════════════════════════════════
+// ═══════════════════
 // 앱 부트
-// ═══════════════════════════════════════════
+// ═══════════════════
 (function(){
   var initScreen=document.getElementById('initScreen');
   var loginScreen=document.getElementById('loginScreen');
@@ -362,35 +260,20 @@ var PWAInstall=(function(){
     hideInit();
     loginScreen.style.display='flex';
     shell.style.display='none';
-    // 마지막 로그인 ID 자동 채움
     try{
-      var raw=localStorage.getItem('gm-session-v2');
-      var sess=raw?JSON.parse(raw):null;
-      if(sess&&sess.name){
-        var idEl=document.getElementById('loginId');
-        if(idEl) idEl.value=sess.name;
-      }
+      var sess=JSON.parse(localStorage.getItem('gm-session-v2')||'null');
+      if(sess&&sess.name){var el=document.getElementById('loginId');if(el)el.value=sess.name}
     }catch(e){}
   }
 
   function showLoading(msg){
-    if(initScreen){
-      var sub=initScreen.querySelector('.sub');
-      if(sub) sub.textContent=msg||'불러오는 중...';
-      initScreen.style.display='flex';
-    }
-    loginScreen.style.display='none';
-    shell.style.display='none';
+    if(initScreen){var sub=initScreen.querySelector('.sub');if(sub)sub.textContent=msg||'불러오는 중...';initScreen.style.display='flex'}
+    loginScreen.style.display='none';shell.style.display='none';
   }
 
   function showError(msg){
     hideInit();
-    loginScreen.innerHTML=
-      '<div class="login-box">'+
-        '<div class="login-title">⚠️ 오류</div>'+
-        '<div class="login-sub">'+(msg||'불러오기 실패')+'</div>'+
-        '<button class="btn-login" onclick="location.reload()">다시 시도</button>'+
-      '</div>';
+    loginScreen.innerHTML='<div class="login-box"><div class="login-title">⚠️ 오류</div><div class="login-sub">'+(msg||'불러오기 실패')+'</div><button class="btn-login" onclick="location.reload()">다시 시도</button></div>';
     loginScreen.style.display='flex';
   }
 
@@ -398,14 +281,12 @@ var PWAInstall=(function(){
     if(started)return;
     started=true;
     try{
-      var savedPT=Store.get('pt');
-      if(savedPT)PT=savedPT;
+      var savedPT=Store.get('pt');if(savedPT)PT=savedPT;
       Auth.initAccounts();
       Engine.rebuild();
       if(!Auth.tryAutoLogin()){
         showLogin();
       }else{
-        // 로그인 성공 시 PWA 설치 체크
         setTimeout(function(){PWAInstall.checkAfterLogin()},2000);
       }
     }catch(e){
@@ -416,7 +297,7 @@ var PWAInstall=(function(){
 
   function backgroundRefreshSheets(){
     SheetLoader.loadAll(function(err){
-      if(err){console.error('bg refresh error:',err);return}
+      if(err){console.error('bg refresh:',err);return}
       try{Engine.rebuild()}catch(e){}
     });
   }
@@ -432,30 +313,51 @@ var PWAInstall=(function(){
     });
   }
 
+  // Firebase 초기화
   try{initFirebase()}catch(e){console.error('firebase init error:',e)}
 
+  // 로컬 캐시 로드
   var hasCache=false;
   try{hasCache=SheetLoader.loadFromCache()}catch(e){}
 
   function afterSync(){
-    if(hasCache){startApp();backgroundRefreshSheets()}
-    else{firstLoadSheets()}
+    if(hasCache){
+      startApp();              // 캐시 있으면 즉시 앱 시작
+      backgroundRefreshSheets(); // 백그라운드로 최신 데이터 갱신
+    }else{
+      firstLoadSheets();       // 캐시 없으면 시트 로드 후 시작
+    }
   }
 
-  try{Store.syncFromFirebase(function(){afterSync()})}
-  catch(e){afterSync()}
+  // Firebase 동기화 - 최대 5초 대기 후 강제 진행
+  var syncDone=false;
+  function doSync(){
+    if(syncDone)return;
+    syncDone=true;
+    afterSync();
+  }
+
+  var syncTimer=setTimeout(function(){
+    console.warn('Firebase sync timeout - proceeding without sync');
+    doSync();
+  },5000);
+
+  try{
+    Store.syncFromFirebase(function(){
+      clearTimeout(syncTimer);
+      doSync();
+    });
+  }catch(e){
+    console.error('syncFromFirebase error:',e);
+    clearTimeout(syncTimer);
+    doSync();
+  }
 
   // Service Worker 등록
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./sw.js').then(function(reg){
-      console.log('SW registered');
-      // 로그인 후에도 PWA 설치 가능하도록 체크
-      reg.addEventListener('updatefound',function(){
-        console.log('SW update found');
-      });
-    }).catch(function(err){
-      console.error('SW registration failed:',err);
-    });
+    navigator.serviceWorker.register('./sw.js')
+      .then(function(){console.log('SW registered')})
+      .catch(function(e){console.error('SW failed:',e)});
   }
 })();
 </script>
