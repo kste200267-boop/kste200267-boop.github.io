@@ -1,6 +1,6 @@
-// js/auth.js — 인증 (localStorage 기반 영구 로그인 유지)
+// js/auth.js — 인증 (localStorage 영구 세션)
 var Auth=(function(){
-  var SESSION_KEY='gm-session-v2'; // v2: localStorage 기반
+  var SESSION_KEY='gm-session-v2';
 
   function initAccounts(){
     if(Store.get('accounts',null)) return;
@@ -14,34 +14,57 @@ var Auth=(function(){
   function getAccounts(){return Store.get('accounts',{})}
   function saveAccounts(a){Store.set('accounts',a)}
 
-  // 세션 저장 (localStorage → 앱 닫아도 유지)
   function saveSession(name,role){
-    try{localStorage.setItem(SESSION_KEY,JSON.stringify({name:name,role:role,ts:Date.now()}))}catch(e){}
+    try{
+      localStorage.setItem(SESSION_KEY,JSON.stringify({name:name,role:role,ts:Date.now()}));
+    }catch(e){}
   }
+
   function loadSession(){
+    // v2 (localStorage) 먼저
     try{
       var raw=localStorage.getItem(SESSION_KEY);
-      return raw?JSON.parse(raw):null;
-    }catch(e){return null}
+      if(raw){
+        var s=JSON.parse(raw);
+        if(s&&s.name) return s;
+      }
+    }catch(e){}
+    // 구버전 (sessionStorage) 폴백 → 마이그레이션
+    try{
+      var raw2=sessionStorage.getItem('gm-session');
+      if(raw2){
+        var s2=JSON.parse(raw2);
+        if(s2&&s2.name){
+          saveSession(s2.name,s2.role||'user'); // localStorage로 이전
+          sessionStorage.removeItem('gm-session');
+          return s2;
+        }
+      }
+    }catch(e){}
+    return null;
   }
+
   function clearSession(){
     try{localStorage.removeItem(SESSION_KEY)}catch(e){}
-    // 구버전 세션도 제거
     try{sessionStorage.removeItem('gm-session')}catch(e){}
   }
 
   function login(){
-    var id=document.getElementById('loginId').value.trim();
-    var pw=document.getElementById('loginPw').value;
+    var id=(document.getElementById('loginId').value||'').trim();
+    var pw=document.getElementById('loginPw').value||'';
     var err=document.getElementById('loginErr');
     if(!id||!pw){err.textContent='아이디와 비밀번호를 입력하세요';return}
-    var acc=getAccounts(),found=null;
-    for(var k in acc){if(acc[k].id===id){found=acc[k];found._key=k;break}}
+
+    var acc=getAccounts(),found=null,foundKey=null;
+    for(var k in acc){
+      if(acc[k].id===id){found=acc[k];foundKey=k;break}
+    }
     if(!found){err.textContent='존재하지 않는 아이디입니다';return}
     if(found.pw!==pw){err.textContent='비밀번호가 틀렸습니다';return}
+
     err.textContent='';
-    saveSession(found._key,found.role);
-    showApp(found._key,found.role==='admin');
+    saveSession(foundKey,found.role);
+    showApp(foundKey,found.role==='admin');
   }
 
   function logout(){
@@ -50,32 +73,28 @@ var Auth=(function(){
   }
 
   function tryAutoLogin(){
+    var sess=loadSession();
+    if(!sess||!sess.name) return false;
+
+    // 핵심: 세션이 있으면 일단 로그인 시도
+    // accounts 동기화 전이어도 이름만 있으면 앱 시작
+    // (accounts가 나중에 Firebase에서 로드되면 자동 반영됨)
     try{
-      // v2 localStorage 세션 먼저
-      var sess=loadSession();
-      // 구버전 sessionStorage 폴백
-      if(!sess){
-        var raw=sessionStorage.getItem('gm-session');
-        if(raw){
-          sess=JSON.parse(raw);
-          // 구버전이면 localStorage로 마이그레이션
-          if(sess&&sess.name) saveSession(sess.name,sess.role);
-        }
-      }
-      if(!sess||!sess.name) return false;
-
       var acc=getAccounts();
-      var tdLoaded=(typeof TD_A!=='undefined')&&Object.keys(TD_A||{}).length>0;
+      var role=sess.role||'user';
 
-      if(acc[sess.name]||(tdLoaded&&TD_A[sess.name])){
-        showApp(sess.name,sess.role==='admin');
-        return true;
+      // accounts에 있으면 그 역할 사용
+      if(acc[sess.name]){
+        role=acc[sess.name].role||role;
       }
+
+      showApp(sess.name, role==='admin');
+      return true;
     }catch(e){
-      console.error('auto login error:',e);
+      console.error('tryAutoLogin error:',e);
       clearSession();
+      return false;
     }
-    return false;
   }
 
   function showApp(name,isAdmin){
@@ -89,7 +108,7 @@ var Auth=(function(){
       console.error('App.init error:',e);
       setTimeout(function(){
         try{App.init(name,isAdmin)}catch(e2){console.error('retry failed:',e2)}
-      },500);
+      },600);
     }
   }
 
