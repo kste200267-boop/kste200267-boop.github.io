@@ -32,19 +32,21 @@ function login(){
 
 function logout(){
   sessionStorage.removeItem('gm-session');
-  document.getElementById('shell').style.display='none';
-  document.getElementById('loginScreen').style.display='flex';
-  document.getElementById('loginId').value='';
-  document.getElementById('loginPw').value='';
-  document.getElementById('loginErr').textContent='';
+  location.reload();
 }
 
 function tryAutoLogin(){
-  var raw=sessionStorage.getItem('gm-session');
-  var sess=raw?JSON.parse(raw):null;
-  if(sess&&(TD_A[sess.name]||Store.get('td-custom-'+sess.name))){
-    showApp(sess.name,sess.role==='admin');
-    return true;
+  try{
+    var raw = sessionStorage.getItem('gm-session');
+    var sess = raw ? JSON.parse(raw) : null;
+
+    if(sess && (TD_A[sess.name] || Store.get('td-custom-' + sess.name))){
+      showApp(sess.name, sess.role === 'admin');
+      return true;
+    }
+  }catch(e){
+    console.error('auto login parse error:', e);
+    sessionStorage.removeItem('gm-session');
   }
   return false;
 }
