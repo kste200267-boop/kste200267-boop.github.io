@@ -8,6 +8,8 @@
 <meta name="theme-color" content="#1a73e8">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <style>
+  .print-head{display:none}
+.print-sub{display:none}
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#ffffff;--bg2:#f8f9fa;--bg3:#f1f3f4;--tx:#202124;--tx2:#5f6368;--tx3:#80868b;--bd:#dadce0;--blue:#1a73e8;--blue-bg:#e8f0fe;--red:#e53935;--font:'Noto Sans KR',sans-serif}
 @media(prefers-color-scheme:dark){:root{--bg:#1e1e1e;--bg2:#2d2d2d;--bg3:#3c3c3c;--tx:#e8eaed;--tx2:#9aa0a6;--tx3:#71767b;--bd:#444;--blue:#8ab4f8;--blue-bg:#1a3a5c;--red:#f28b82}}
@@ -130,6 +132,23 @@ input,select,textarea{font-family:var(--font)}
 }
 
 @media print{
+  .print-head{
+  display:block !important;
+  text-align:center;
+  font-size:20px;
+  font-weight:700;
+  margin:0 0 2mm 0;
+  color:#000 !important;
+}
+
+.print-sub{
+  display:block !important;
+  text-align:center;
+  font-size:12px;
+  font-weight:600;
+  margin:0 0 4mm 0;
+  color:#000 !important;
+}
   @page{
     size:A4 landscape;
     margin:5mm;
@@ -301,7 +320,24 @@ function fmtDate(d){var x=new Date(d);return (x.getMonth()+1)+'/'+x.getDate()}
 function dayIdx(d){return (new Date(d).getDay()+6)%7}
 function isToday(d){return new Date(d).toDateString()===new Date().toDateString()}
 function getMonday(dt){var d=new Date(dt);d.setDate(d.getDate()-((d.getDay()+6)%7));d.setHours(0,0,0,0);return d}
-function getWeekNum(dt){var d=new Date(dt),f=new Date(d.getFullYear(),d.getMonth(),1);return Math.ceil((d.getDate()+((f.getDay()+6)%7))/7)}
+function getWeekNum(dt){
+  var d = new Date(dt);
+
+  // 해당 월의 첫 번째 '월요일'
+  var firstMonday = new Date(d.getFullYear(), d.getMonth(), 1);
+  while (firstMonday.getDay() !== 1) {
+    firstMonday.setDate(firstMonday.getDate() + 1);
+  }
+
+  // 현재 날짜가 속한 주의 월요일
+  var currentMonday = getMonday(d);
+
+  // 월의 첫 월요일보다 앞에 걸치면 1째주로 처리
+  if (currentMonday < firstMonday) return 1;
+
+  var diffDays = Math.floor((currentMonday - firstMonday) / (1000 * 60 * 60 * 24));
+  return Math.floor(diffDays / 7) + 1;
+}
 function getWeekRange(dt){var m=getMonday(dt),s=new Date(m);s.setDate(m.getDate()+6);s.setHours(23,59,59,999);return{start:m,end:s}}
 function getMonthRange(y,m){return{start:new Date(y,m,1),end:new Date(y,m+1,0,23,59,59,999)}}
 function getWeeksInMonth(y,m){var last=new Date(y,m+1,0),ws=[];var c=getMonday(new Date(y,m,1));while(c<=last){var e=new Date(c);e.setDate(c.getDate()+6);ws.push({start:new Date(c),end:e});c.setDate(c.getDate()+7)}return ws}
@@ -714,7 +750,9 @@ function render() {
     return;
   }
 
-  app.appendChild(renderHeader());
+ app.appendChild(h('div', {className:'print-head'}, '경북기계금속고등학교'));
+app.appendChild(h('div', {className:'print-sub'}, '주간 계획'));
+app.appendChild(renderHeader());
   if (state.demo) app.appendChild(h('div', {className:'demo-bar'}, '데모 모드 — Google Cloud에서 OAuth 클라이언트 ID 설정 후 실제 캘린더 연동'));
   app.appendChild(renderNav());
   app.appendChild(renderFilters());
