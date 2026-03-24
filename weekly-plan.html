@@ -642,7 +642,7 @@ function loadEvents() {
 
     sessionStorage.setItem('gtoken', state.accessToken);
 
-    state.events = (data.items || []).map(function(ev) {
+    var googleEvents = (data.items || []).map(function(ev) {
       var dept = classifyEvent(
         ev.summary || '',
         ev.description || '',
@@ -667,61 +667,124 @@ function loadEvents() {
       };
     });
 
-    if (!state.activeDepts) {
-      state.activeDepts = state.departments.map(function(d) { return d.name; });
-    }
+    fetchEventOverlay(function(overlay) {
+      state.events = mergeGoogleWithOverlay(googleEvents, overlay);
 
-    saveCache(state.events);
-    state.loading = false;
-    render();
+      if (!state.activeDepts) {
+        state.activeDepts = state.departments.map(function(d) { return d.name; });
+      }
+
+      saveCache(state.events);
+      state.loading = false;
+      render();
+    });
   });
 }
 
+
 function createEvent(data) {
+  if (!_wkDb) {
+    showToast('Firebase 연결 전입니다.');
+    return;
+  }
+
   var title = data.title;
   if (title.indexOf('[') !== 0) title = '[' + data.department + '] ' + title;
 
+  var deptObj = state.departments.find(function(d) { return d.name === data.department; });
+
+  var eventId = makeLocalEventId();
   var body = {
-    summary: title,
+    id: eventId,
+    title: title,
     description: data.description || '',
-    location: data.location || ''
+    location: data.location || '',
+    start: data.start,
+    end: data.end,
+    isAllDay: !!data.isAllDay,
+    department: data.department,
+    departmentColor: deptObj ? deptObj.color : '#1a73e8',
+    source: 'local',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 
-  if (data.isAllDay) {
-    body.start = { date: data.start.slice(0, 10) };
-    body.end = { date: data.end.slice(0, 10) };
-  } else {
-    body.start = { dateTime: data.start, timeZone: 'Asia/Seoul' };
-    body.end = { dateTime: data.end, timeZone: 'Asia/Seoul' };
-  }
-
-  var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(CALENDAR_ID) + '/events';
-  apiPost(url, body, function() { showToast('일정 추가 완료'); loadEvents(); });
+  eventLocalRef(eventId).set(body).then(function() {
+    showToast('일정 추가 완료');
+    loadEvents();
+  }).catch(function() {
+    showToast('일정 추가 실패');
+  });
 }
+
 
 function updateEvent(eventId, data) {
-  var body = {
-    summary: data.title,
-    description: data.description || '',
-    location: data.location || ''
-  };
-
-  if (data.isAllDay) {
-    body.start = { date: data.start.slice(0, 10) };
-    body.end = { date: data.end.slice(0, 10) };
-  } else {
-    body.start = { dateTime: data.start, timeZone: 'Asia/Seoul' };
-    body.end = { dateTime: data.end, timeZone: 'Asia/Seoul' };
+  if (!_wkDb) {
+    showToast('Firebase 연결 전입니다.');
+    return;
   }
 
-  var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(CALENDAR_ID) + '/events/' + eventId;
-  apiPatch(url, body, function() { showToast('일정 수정 완료'); loadEvents(); });
+  var deptObj = state.departments.find(function(d) { return d.name === data.department; });
+
+  var body = {
+    title: data.title,
+    description: data.description || '',
+    location: data.location || '',
+    start: data.start,
+    end: data.end,
+    isAllDay: !!data.isAllDay,
+    department: data.department,
+    departmentColor: deptObj ? deptObj.color : '#1a73e8',
+    deleted: false,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (isLocalEventId(eventId)) {
+    eventLocalRef(eventId).set(body, { merge: true }).then(function() {
+      showToast('일정 수정 완료');
+      loadEvents();
+    }).catch(function() {
+      showToast('일정 수정 실패');
+    });
+    return;
+  }
+
+  eventPatchRef(eventId).set(body, { merge: true }).then(function() {
+    showToast('일정 수정 완료');
+    loadEvents();
+  }).catch(function() {
+    showToast('일정 수정 실패');
+  });
 }
 
+
 function deleteEvent(eventId) {
-  var url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(CALENDAR_ID) + '/events/' + eventId;
-  apiDelete(url, function() { showToast('일정 삭제 완료'); loadEvents(); });
+  if (!_wkDb) {
+    showToast('Firebase 연결 전입니다.');
+    return;
+  }
+
+  if (isLocalEventId(eventId)) {
+    eventLocalRef(eventId).delete().then(function() {
+      showToast('일정 삭제 완료');
+      loadEvents();
+    }).catch(function() {
+      showToast('일정 삭제 실패');
+    });
+    return;
+  }
+
+  eventPatchRef(eventId).set({
+    deleted: true,
+    updatedAt: new Date().toISOString()
+  }, { merge: true }).then(function() {
+    showToast('일정 삭제 완료');
+    loadEvents();
+  }).catch(function() {
+    showToast('일정 삭제 실패');
+  });
 }
+
 
 // ═══════════════════════════════════════════════════════════
 // DEMO DATA
@@ -1574,6 +1637,129 @@ document.addEventListener('click', function(e) {
 // FIREBASE SYNC (부서/장소를 서버에 저장)
 // ═══════════════════════════════════════════════════════════
 var _wkDb = null;
+
+// ═══════════════════════════════════════════════════════════
+// EVENT OVERLAY (Google 원본 + Firebase 수정/추가/삭제)
+// ═══════════════════════════════════════════════════════════
+function isLocalEventId(id) {
+  return String(id || '').indexOf('local_') === 0;
+}
+
+function makeLocalEventId() {
+  return 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function eventPatchRef(eventId) {
+  return _wkDb.collection('portal').doc('weekly-event-patches')
+    .collection('items').doc(String(eventId));
+}
+
+function eventLocalRef(eventId) {
+  return _wkDb.collection('portal').doc('weekly-event-local')
+    .collection('items').doc(String(eventId));
+}
+
+function fetchEventOverlay(cb) {
+  if (!_wkDb) {
+    cb({ patches: {}, locals: [] });
+    return;
+  }
+
+  var result = { patches: {}, locals: [] };
+  var done = 0;
+
+  function finish() {
+    done++;
+    if (done === 2) cb(result);
+  }
+
+  _wkDb.collection('portal').doc('weekly-event-patches')
+    .collection('items')
+    .get()
+    .then(function(snap) {
+      snap.forEach(function(doc) {
+        result.patches[doc.id] = doc.data();
+      });
+      finish();
+    })
+    .catch(function() {
+      finish();
+    });
+
+  _wkDb.collection('portal').doc('weekly-event-local')
+    .collection('items')
+    .get()
+    .then(function(snap) {
+      snap.forEach(function(doc) {
+        var data = doc.data() || {};
+        data.id = doc.id;
+        result.locals.push(data);
+      });
+      finish();
+    })
+    .catch(function() {
+      finish();
+    });
+}
+
+function normalizeEventForView(ev) {
+  var dept = classifyEvent(ev.title || '', ev.description || '', ev.location || '');
+  return {
+    id: ev.id,
+    title: ev.title || '(제목 없음)',
+    description: ev.description || '',
+    location: ev.location || '',
+    start: ev.start,
+    end: ev.end,
+    isAllDay: !!ev.isAllDay,
+    department: ev.department || dept.name,
+    departmentColor: ev.departmentColor || dept.color
+  };
+}
+
+function mergeGoogleWithOverlay(googleEvents, overlay) {
+  var patches = overlay.patches || {};
+  var locals = overlay.locals || [];
+  var merged = [];
+
+  googleEvents.forEach(function(ev) {
+    var patch = patches[ev.id];
+
+    if (patch && patch.deleted) return;
+
+    var item = {
+      id: ev.id,
+      title: ev.title,
+      description: ev.description,
+      location: ev.location,
+      start: ev.start,
+      end: ev.end,
+      isAllDay: ev.isAllDay,
+      department: ev.department,
+      departmentColor: ev.departmentColor
+    };
+
+    if (patch) {
+      if (patch.title != null) item.title = patch.title;
+      if (patch.description != null) item.description = patch.description;
+      if (patch.location != null) item.location = patch.location;
+      if (patch.start != null) item.start = patch.start;
+      if (patch.end != null) item.end = patch.end;
+      if (patch.isAllDay != null) item.isAllDay = patch.isAllDay;
+      if (patch.department != null) item.department = patch.department;
+      if (patch.departmentColor != null) item.departmentColor = patch.departmentColor;
+    }
+
+    merged.push(normalizeEventForView(item));
+  });
+
+  locals.forEach(function(ev) {
+    if (ev.deleted) return;
+    merged.push(normalizeEventForView(ev));
+  });
+
+  return merged;
+}
 
 function initWeeklyFirebase(){
   try{
