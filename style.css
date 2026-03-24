@@ -171,9 +171,9 @@ input,select,textarea{font-family:var(--font)}
   .tt{font-size:.72em}
   .tt td,.tt th{padding:3px 2px;min-width:42px}
   .now-time{font-size:1.6em}
-  /* 홈 3열 → 1열 */
-  .home-3col{grid-template-columns:1fr!important}
-  /* 홈 2열 → 1열 */
+  /* 홈 2단 → 1단 (주간업무 패널 아래로) */
+  .home-main-layout{grid-template-columns:1fr!important}
+  /* 급식+학사 2열 → 1열 */
   .home-2col{grid-template-columns:1fr!important}
 }
 @media print{.topbar,.sidebar{display:none!important}.content{overflow:visible}}
