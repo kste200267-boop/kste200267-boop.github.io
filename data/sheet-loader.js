@@ -172,7 +172,8 @@ function extractTeachers(rows){
       var raw=(j<row.length)?row[j]:'';
       sched.push(cleanTeacherSlot(raw));
     }
-
+console.log('교사:', name, '시수:', hours, '슬롯수:', sched.length, sched);
+teachers[name]={h:hours,s:sched};
     teachers[name]={h:hours,s:sched};
   }
 
