@@ -58,33 +58,14 @@ var PageMy=(function(){
     // 방과후 (기간 내만)
     var afterData=getActiveAfter(U);
     var aPT=[{l:'8교시(방과후)',t:'16:30~17:20'},{l:'9교시(방과후)',t:'17:50~18:20'}];
-   var afterDays = ['수','목','금'];
-
-for(var ap=0;ap<2;ap++){
-  h+='<tr style="background:#f3e5f5"><th style="background:#e1bee7;font-size:.76em">'+aPT[ap].l+'<br><span style="font-weight:400">'+aPT[ap].t+'</span></th>';
-  for(var di=0;di<5;di++){
-    var d=DAYS[di], val='';
-
-    if(!afterDays.includes(d)){
-      h+='<td class="emp">—</td>';
-      continue;
+    for(var ap=0;ap<2;ap++){
+      h+='<tr style="background:#f3e5f5"><th style="background:#e1bee7;font-size:.76em">'+aPT[ap].l+'<br><span style="font-weight:400">'+aPT[ap].t+'</span></th>';
+      for(var di=0;di<5;di++){var d=DAYS[di],val='';
+        for(var ai=0;ai<afterData.length;ai++){if(afterData[ai].day===d){val=ap===0?afterData[ai].p8||'':afterData[ai].p9||'';break}}
+        if(editMode){h+='<td style="cursor:pointer;background:#f3e5f5" onclick="PageMy.editAfter(\''+d+'\','+ap+')">'+(val||'<span style="color:var(--tx3)">+</span>')+'</td>'}
+        else{h+='<td style="background:'+(val?'#ce93d8;color:#fff':'#f3e5f5;color:var(--tx3)')+';font-size:.82em">'+(val||'—')+'</td>'}
+      }h+='</tr>';
     }
-
-    for(var ai=0;ai<afterData.length;ai++){
-      if(afterData[ai].day===d){
-        val=ap===0 ? (afterData[ai].p8||'') : (afterData[ai].p9||'');
-        break;
-      }
-    }
-
-    if(editMode){
-      h+='<td style="cursor:pointer;background:#f3e5f5" onclick="PageMy.editAfter(\''+d+'\','+ap+')">'+(val||'<span style="color:var(--tx3)">+</span>')+'</td>';
-    }else{
-      h+='<td style="background:'+(val?'#ce93d8;color:#fff':'#f3e5f5;color:var(--tx3)')+';font-size:.82em">'+(val||'—')+'</td>';
-    }
-  }
-  h+='</tr>';
-}
     h+='</tbody></table></div></div>';
 
     // 요약
@@ -122,7 +103,7 @@ for(var ap=0;ap<2;ap++){
     h+='<div style="margin-top:12px;padding:12px;background:var(--bg2);border-radius:var(--radius-sm)">';
     h+='<div style="font-weight:600;font-size:.88em;margin-bottom:8px">➕ 방과후 추가</div>';
     h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">';
-    h+='h+='<div><div style="font-size:.78em;color:var(--tx2);margin-bottom:2px">요일</div><select class="ti-sel" id="afDay"><option>수</option><option>목</option><option>금</option></select></div>';
+    h+='<div><div style="font-size:.78em;color:var(--tx2);margin-bottom:2px">요일</div><select class="ti-sel" id="afDay"><option>월</option><option>화</option><option>수</option><option>목</option><option>금</option></select></div>';
     h+='<div><div style="font-size:.78em;color:var(--tx2);margin-bottom:2px">8교시</div><input class="ti-input" id="afP8" placeholder="반명" style="width:80px"></div>';
     h+='<div><div style="font-size:.78em;color:var(--tx2);margin-bottom:2px">9교시</div><input class="ti-input" id="afP9" placeholder="반명" style="width:80px"></div>';
     h+='<div><div style="font-size:.78em;color:var(--tx2);margin-bottom:2px">시작일</div><input class="ti-input" id="afFrom" type="date" style="width:130px"></div>';
@@ -155,29 +136,17 @@ for(var ap=0;ap<2;ap++){
     setAfter(U,data);toast('저장됨');render();
   }
 
- function addAfter(){
-  var U=App.getUser(),data=getAfter(U);
-  var day=document.getElementById('afDay').value;
-  var p8=document.getElementById('afP8').value.trim();
-  var p9=document.getElementById('afP9').value.trim();
-  var from=document.getElementById('afFrom').value;
-  var to=document.getElementById('afTo').value;
-
-  if(['수','목','금'].indexOf(day)===-1){
-    toast('방과후는 수·목·금만 추가할 수 있습니다');
-    return;
+  function addAfter(){
+    var U=App.getUser(),data=getAfter(U);
+    var day=document.getElementById('afDay').value;
+    var p8=document.getElementById('afP8').value.trim();
+    var p9=document.getElementById('afP9').value.trim();
+    var from=document.getElementById('afFrom').value;
+    var to=document.getElementById('afTo').value;
+    if(!p8&&!p9){toast('8교시 또는 9교시를 입력하세요');return}
+    data.push({day:day,p8:p8,p9:p9,from:from,to:to});
+    setAfter(U,data);toast(day+' 방과후 추가됨');render();
   }
-
-  if(!p8&&!p9){
-    toast('8교시 또는 9교시를 입력하세요');
-    return;
-  }
-
-  data.push({day:day,p8:p8,p9:p9,from:from,to:to});
-  setAfter(U,data);
-  toast(day+' 방과후 추가됨');
-  render();
-}
 
   function delAfter(idx){
     var U=App.getUser(),data=getAfter(U);
