@@ -50,11 +50,17 @@ function tryAutoLogin(){
   }
   return false;
 }
-  function showApp(name,isAdmin){
-    document.getElementById('loginScreen').style.display='none';
-    document.getElementById('shell').style.display='flex';
+function showApp(name,isAdmin){
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('shell').style.display='flex';
+
+  requestAnimationFrame(function(){
     App.init(name,isAdmin);
-  }
+    requestAnimationFrame(function(){
+      window.dispatchEvent(new Event('resize'));
+    });
+  });
+}
   return{initAccounts:initAccounts,getAccounts:getAccounts,saveAccounts:saveAccounts,login:login,logout:logout,tryAutoLogin:tryAutoLogin,
     changePw:function(){
       var user=App.getUser();if(!user)return;
