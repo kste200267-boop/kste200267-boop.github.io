@@ -97,17 +97,27 @@ function cleanTeacherSlot(v){
     if(classes[mapped]) continue;
 
     var cls={};
-    for(var day in DAY_COLS){
-      var cols=DAY_COLS[day];
-      var periods=[];
-      for(var j=0;j<cols.length;j++){
-        var ci=cols[j];
-        var v=(ci<row.length)?row[ci]:'';
-        v=(v||'').replace(/\n/g,'').trim();
-        periods.push(v||null);
-      }
-      cls[day]=periods;
+for(var day in DAY_COLS){
+  var cols=DAY_COLS[day];
+  var periods=[];
+  var lastValue=null;
+
+  for(var j=0;j<cols.length;j++){
+    var ci=cols[j];
+    var v=(ci<row.length)?row[ci]:'';
+    v=(v||'').replace(/\n/g,'').trim();
+
+    // 병합 셀 때문에 빈칸이면 바로 이전 값으로 채움
+    if(v){
+      lastValue=v;
+      periods.push(v);
+    }else{
+      periods.push(lastValue);
     }
+  }
+
+  cls[day]=periods;
+}
 
     classes[mapped]=cls;
   }
