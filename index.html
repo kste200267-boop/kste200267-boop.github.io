@@ -108,24 +108,25 @@
     shell.style.display = 'none';
   }
 
-function startApp() {
-  if (started) return;
-  started = true;
+  function startApp() {
+    if (started) return;
+    started = true;
 
-  try {
-    var savedPT = Store.get('pt');
-    if (savedPT) PT = savedPT;
+    try {
+      var savedPT = Store.get('pt');
+      if (savedPT) PT = savedPT;
 
-    Auth.initAccounts();
+      Auth.initAccounts();
+      Engine.rebuild();
 
-    if (!Auth.tryAutoLogin()) {
-      showLogin();
+      if (!Auth.tryAutoLogin()) {
+        showLogin();
+      }
+    } catch (e) {
+      console.error('startApp error:', e);
+      showError('앱 초기화 중 오류가 발생했습니다.<br>새로고침 후 다시 시도하세요.');
     }
-  } catch (e) {
-    console.error('startApp error:', e);
-    showError('앱 초기화 중 오류가 발생했습니다.<br>새로고침 후 다시 시도하세요.');
   }
-}
 
   function backgroundRefreshSheets() {
     SheetLoader.loadAll(function(err) {
