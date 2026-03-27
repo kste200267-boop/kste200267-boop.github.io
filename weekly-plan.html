@@ -256,11 +256,19 @@ function getWeeksInMonth(y,m){var last=new Date(y,m+1,0),ws=[];var c=getMonday(n
 function cleanTitle(t){return t.replace(/\[[^\]]+\]\s*/,'')}
 
 function classifyEvent(title, description, location){
+  // ★ [부서명] 형식이 있으면 무조건 최우선
+  var bracketMatch=(title||'').match(/^\[([^\]]+)\]/);
+  if(bracketMatch){
+    var bname=bracketMatch[1];
+    for(var i=0;i<state.departments.length;i++){
+      if(state.departments[i].name===bname)return state.departments[i];
+    }
+  }
+  // 없으면 키워드 매칭
   var text=[title||'',description||'',location||''].join(' ').toLowerCase();
   var best=null,bestScore=0;
   for(var i=0;i<state.departments.length;i++){
     var d=state.departments[i],score=0;
-    if((title||'').indexOf('['+d.name+']')>=0)score+=100;
     for(var j=0;j<d.keywords.length;j++){
       var kw=d.keywords[j].toLowerCase();
       if(text.indexOf(kw)>=0)score+=kw.length;
@@ -269,7 +277,6 @@ function classifyEvent(title, description, location){
   }
   return best||state.departments[0];
 }
-
 // ═══════════════════════════════════════════════════════════
 // PUBLIC CACHE (Firebase에서 캘린더 데이터 공유)
 // ═══════════════════════════════════════════════════════════
