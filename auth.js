@@ -62,6 +62,10 @@ var Auth=(function(){
   }
 
   function showApp(name,isAdmin){
+    // ★ initScreen 반드시 숨김
+    var initScreen=document.getElementById('initScreen');
+    if(initScreen)initScreen.style.display='none';
+
     var ls=document.getElementById('loginScreen'),sh=document.getElementById('shell');
     if(ls)ls.style.display='none';
     if(sh)sh.style.display='flex';
