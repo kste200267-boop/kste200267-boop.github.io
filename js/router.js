@@ -39,8 +39,9 @@ var Router=(function(){
     document.getElementById('sidebar').innerHTML=h;
   }
   function go(id){
-    cur=id;buildNav();
-    document.getElementById('content').innerHTML='<div class="page-wrap" id="pg"></div>';
+  cur=id;buildNav();
+  location.hash=id; // ★ URL에 현재 페이지 저장
+  document.getElementById('content').innerHTML='<div class="page-wrap" id="pg"></div>';
     var pages={home:PageHome,my:PageMy,full:PageFull,swap:PageSwap,history:PageHistory,
       weekly:PageWeekly,meal:PageMeal,schedule:PageSchedule,tasks:PageTasks,
       admin:PageAdmin,profile:PageProfile,roster:PageRoster};
