@@ -52,7 +52,7 @@ input,select,textarea{font-family:var(--font)}
 .stat-label{font-size:10px;color:var(--tx2)}
 .stat-val{font-size:18px;font-weight:600}
 
-.week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.week-grid{display:grid;grid-template-columns:repeat(7,minmax(80px,1fr));border:1px solid var(--bd);border-radius:8px;overflow-x:auto;width:100%}
 .day-col{border-right:1px solid var(--bd);min-height:220px;display:flex;flex-direction:column}
 .day-col:last-child{border-right:none}
 .day-head{text-align:center;padding:6px 2px;border-bottom:1px solid var(--bd);background:var(--bg2)}
@@ -1032,24 +1032,6 @@ function renderDeptManager(){
   top.appendChild(h('button',{className:'btn btn-sm',onClick:function(){state.showMgr=false;render()}},'✕'));
   modal.appendChild(top);
   modal.appendChild(h('div',{style:{fontSize:'11px',color:'var(--tx3)',marginBottom:'8px'}},'▲▼ 버튼으로 표시 순서 변경'));
-
-  state.departments.forEach(function(d,i){
-    var row=h('div',{style:{display:'flex',alignItems:'center',gap:'6px',padding:'7px 0',borderBottom:'1px solid var(--bd)'}});
-    var arrows=h('div',{style:{display:'flex',flexDirection:'column',gap:'2px'}});
-    arrows.appendChild(h('button',{style:{background:'none',border:'none',cursor:'pointer',fontSize:'10px',padding:'0 2px',color:'var(--tx3)'},
-      onClick:function(){if(i===0)return;var a=state.departments,t=a[i];a[i]=a[i-1];a[i-1]=t;saveDepts();render()}},'▲'));
-    arrows.appendChild(h('button',{style:{background:'none',border:'none',cursor:'pointer',fontSize:'10px',padding:'0 2px',color:'var(--tx3)'},
-      onClick:function(){if(i===state.departments.length-1)return;var a=state.departments,t=a[i];a[i]=a[i+1];a[i+1]=t;saveDepts();render()}},'▼'));
-    row.appendChild(arrows);
-    row.appendChild(h('span',{style:{width:'10px',height:'10px',borderRadius:'50%',background:d.color,flexShrink:0}}));
-    var info=h('div',{style:{flex:1,minWidth:0}});
-    info.appendChild(h('div',{style:{fontSize:'13px',fontWeight:500}},d.name));
-    info.appendChild(h('div',{style:{fontSize:'10px',color:'var(--tx3)'}},d.keywords.join(', ')));
-    row.appendChild(info);
-    row.appendChild(h('button',{style:{background:'none',border:'none',fontSize:'13px',cursor:'pointer',color:'var(--tx3)',padding:'2px 4px'},
-      onClick:function(){state.departments.splice(i,1);if(state.activeDepts)state.activeDepts=state.activeDepts.filter(function(x){return x!==d.name});saveDepts();render()}},'✕'));
-    modal.appendChild(row);
-  });
 
   var addBox=h('div',{style:{background:'var(--bg2)',borderRadius:'8px',padding:'12px',marginTop:'14px'}});
   addBox.appendChild(h('div',{style:{fontSize:'12px',fontWeight:500,marginBottom:'8px'}},'부서 추가'));
