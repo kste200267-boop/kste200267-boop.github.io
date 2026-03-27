@@ -1028,46 +1028,150 @@ function renderDeptManager(){
   });
   var modal=h('div',{className:'modal modal-md'});
   var top=h('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'14px'}});
-  top.appendChild(h('span',{className:'modal-title'},'부서 관리'));
+  top.appendChild(h('span',{className:'modal-title'},'부서/장소 관리'));
   top.appendChild(h('button',{className:'btn btn-sm',onClick:function(){state.showMgr=false;render()}},'✕'));
   modal.appendChild(top);
-  modal.appendChild(h('div',{style:{fontSize:'11px',color:'var(--tx3)',marginBottom:'8px'}},'▲▼ 버튼으로 표시 순서 변경'));
+  modal.appendChild(h('div',{style:{fontSize:'11px',color:'var(--tx3)',marginBottom:'8px'}},'이름·키워드·색상 편집 후 [저장] 버튼을 누르세요'));
 
+  var COLORS=['#5C6BC0','#3949AB','#8E24AA','#0F9D58','#43A047','#1E88E5','#00ACC1','#FB8C00','#F4511E','#00897B','#6D4C41','#F4B400','#DB4437','#7CB342','#C0CA33','#8D6E63','#546E7A','#6A1B9A','#EF6C00','#E91E63'];
+
+  // 기존 부서 목록 — 인라인 편집
+  state.departments.forEach(function(d,i){
+    var row=h('div',{style:{display:'flex',alignItems:'flex-start',gap:'6px',padding:'8px 0',borderBottom:'1px solid var(--bd)'}});
+
+    // 순서 버튼
+    var arrows=h('div',{style:{display:'flex',flexDirection:'column',gap:'1px',paddingTop:'4px'}});
+    arrows.appendChild(h('button',{style:{background:'none',border:'none',cursor:'pointer',fontSize:'10px',padding:'0 3px',color:'var(--tx3)'},
+      onClick:function(){if(i===0)return;var a=state.departments,t=a[i];a[i]=a[i-1];a[i-1]=t;saveDepts();render()}},'▲'));
+    arrows.appendChild(h('button',{style:{background:'none',border:'none',cursor:'pointer',fontSize:'10px',padding:'0 3px',color:'var(--tx3)'},
+      onClick:function(){if(i===state.departments.length-1)return;var a=state.departments,t=a[i];a[i]=a[i+1];a[i+1]=t;saveDepts();render()}},'▼'));
+    row.appendChild(arrows);
+
+    // 편집 영역
+    var editBox=h('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:'4px'}});
+
+    // 이름 + 색상 팔레트
+    var nameRow=h('div',{style:{display:'flex',gap:'6px',alignItems:'center',flexWrap:'wrap'}});
+    var nameIn=h('input',{className:'form-input',value:d.name,style:{width:'120px',padding:'4px 7px',fontSize:'12px'},placeholder:'부서명'});
+    var colorPicker=h('div',{style:{display:'flex',gap:'2px',flexWrap:'wrap',maxWidth:'180px'}});
+    COLORS.forEach(function(c){
+      (function(cc){
+        var dot=h('span',{
+          style:{width:'18px',height:'18px',borderRadius:'50%',background:cc,cursor:'pointer',display:'inline-block',
+            border:cc===d.color?'2px solid #333':'2px solid transparent'},
+          onClick:function(){
+            d.color=cc;
+            colorPicker.querySelectorAll('span').forEach(function(s){s.style.border='2px solid transparent'});
+            this.style.border='2px solid #333';
+          }
+        });
+        colorPicker.appendChild(dot);
+      })(c);
+    });
+    nameRow.appendChild(nameIn);
+    nameRow.appendChild(colorPicker);
+    editBox.appendChild(nameRow);
+
+    // 키워드
+    var kwIn=h('input',{className:'form-input',value:d.keywords.join(', '),
+      style:{padding:'3px 7px',fontSize:'11px',color:'var(--tx2)'},placeholder:'키워드 (쉼표 구분)'});
+    editBox.appendChild(kwIn);
+
+    // 저장 버튼
+    var saveBtn=h('button',{className:'btn btn-sm btn-primary',style:{alignSelf:'flex-start',marginTop:'2px'},
+      onClick:function(){
+        var newName=nameIn.value.trim();
+        if(!newName){showToast('부서명 입력');return;}
+        var oldName=d.name;
+        d.name=newName;
+        d.keywords=kwIn.value.split(',').map(function(k){return k.trim();}).filter(Boolean);
+        if(oldName!==newName&&state.activeDepts){
+          var idx=state.activeDepts.indexOf(oldName);
+          if(idx>=0)state.activeDepts[idx]=newName;
+        }
+        saveDepts();showToast('저장됨');render();
+      }
+    },'저장');
+    editBox.appendChild(saveBtn);
+    row.appendChild(editBox);
+
+    // 삭제
+    row.appendChild(h('button',{
+      style:{background:'none',border:'none',fontSize:'14px',cursor:'pointer',color:'var(--tx3)',padding:'4px',marginTop:'2px'},
+      onClick:function(){
+        if(!confirm(d.name+' 삭제?'))return;
+        state.departments.splice(i,1);
+        if(state.activeDepts)state.activeDepts=state.activeDepts.filter(function(x){return x!==d.name;});
+        saveDepts();render();
+      }
+    },'✕'));
+    modal.appendChild(row);
+  });
+
+  // 부서 추가
   var addBox=h('div',{style:{background:'var(--bg2)',borderRadius:'8px',padding:'12px',marginTop:'14px'}});
   addBox.appendChild(h('div',{style:{fontSize:'12px',fontWeight:500,marginBottom:'8px'}},'부서 추가'));
   addBox.appendChild(h('input',{className:'form-input',id:'m-name',placeholder:'부서 이름',style:{marginBottom:'6px'}}));
-  addBox.appendChild(h('input',{className:'form-input',id:'m-kw',placeholder:'키워드 (쉼표 구분)',style:{marginBottom:'6px'}}));
-  var COLORS=['#4285F4','#0F9D58','#F4B400','#DB4437','#AB47BC','#00ACC1','#FF7043','#795548','#E91E63','#3F51B5','#009688','#8BC34A'];
+  addBox.appendChild(h('input',{className:'form-input',id:'m-kw',placeholder:'키워드 (쉼표 구분)',style:{marginBottom:'8px'}}));
   var colorRow=h('div',{style:{display:'flex',gap:'3px',flexWrap:'wrap',marginBottom:'8px'}});
+  var selectedNewColor={v:'#9C27B0'};
   COLORS.forEach(function(c){
-    colorRow.appendChild(h('span',{style:{width:'22px',height:'22px',borderRadius:'50%',background:c,cursor:'pointer',border:'2px solid transparent',display:'inline-block'},
-      onClick:function(){
-        document.getElementById('m-color').value=c;
-        colorRow.querySelectorAll('span').forEach(function(s){s.style.border='2px solid transparent'});
-        this.style.border='2px solid var(--tx)';
-      }
-    }));
+    (function(cc){
+      var dot=h('span',{
+        style:{width:'22px',height:'22px',borderRadius:'50%',background:cc,cursor:'pointer',
+          border:cc===selectedNewColor.v?'2px solid #333':'2px solid transparent',display:'inline-block'},
+        onClick:function(){
+          selectedNewColor.v=cc;
+          colorRow.querySelectorAll('span').forEach(function(s){s.style.border='2px solid transparent'});
+          this.style.border='2px solid #333';
+        }
+      });
+      colorRow.appendChild(dot);
+    })(c);
   });
   addBox.appendChild(colorRow);
-  addBox.appendChild(h('input',{type:'hidden',id:'m-color',value:'#9C27B0'}));
   addBox.appendChild(h('button',{
     className:'btn btn-primary',style:{width:'100%',padding:'8px'},
     onClick:function(){
       var name=document.getElementById('m-name').value.trim();
       if(!name)return;
       var kw=document.getElementById('m-kw').value;
-      var keywords=kw?kw.split(',').map(function(k){return k.trim()}).filter(Boolean):[name];
-      var color=document.getElementById('m-color').value;
-      state.departments.push({name:name,keywords:keywords,color:color,order:state.departments.length});
+      var keywords=kw?kw.split(',').map(function(k){return k.trim();}).filter(Boolean):[name];
+      state.departments.push({name:name,keywords:keywords,color:selectedNewColor.v,order:state.departments.length});
       if(state.activeDepts)state.activeDepts.push(name);
       saveDepts();showToast(name+' 추가됨');render();
     }
   },'추가'));
   modal.appendChild(addBox);
+
+  // 장소 관리
+  var locBox=h('div',{style:{background:'var(--bg2)',borderRadius:'8px',padding:'12px',marginTop:'10px'}});
+  locBox.appendChild(h('div',{style:{fontSize:'12px',fontWeight:500,marginBottom:'8px'}},'📍 장소 목록'));
+  state.locations.forEach(function(loc,i){
+    var row2=h('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'4px'}});
+    var locIn=h('input',{className:'form-input',value:loc,style:{flex:1,padding:'4px 7px',fontSize:'12px'}});
+    row2.appendChild(locIn);
+    row2.appendChild(h('button',{className:'btn btn-sm btn-primary',onClick:function(){
+      state.locations[i]=locIn.value.trim();saveLocs();showToast('저장됨');
+    }},'저장'));
+    row2.appendChild(h('button',{className:'btn btn-sm',style:{color:'var(--red)'},onClick:function(){
+      state.locations.splice(i,1);saveLocs();render();
+    }},'✕'));
+    locBox.appendChild(row2);
+  });
+  var addLocRow=h('div',{style:{display:'flex',gap:'6px',marginTop:'6px'}});
+  addLocRow.appendChild(h('input',{className:'form-input',id:'new-loc',placeholder:'새 장소 이름',style:{flex:1,padding:'4px 7px',fontSize:'12px'}}));
+  addLocRow.appendChild(h('button',{className:'btn btn-sm btn-primary',onClick:function(){
+    var v=document.getElementById('new-loc').value.trim();
+    if(!v)return;
+    state.locations.push(v);saveLocs();showToast(v+' 추가');render();
+  }},'추가'));
+  locBox.appendChild(addLocRow);
+  modal.appendChild(locBox);
+
   overlay.appendChild(modal);
   return overlay;
 }
-
 // ═══════════════════════════════════════════════════════════
 // FIREBASE
 // ═══════════════════════════════════════════════════════════
