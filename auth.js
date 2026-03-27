@@ -60,13 +60,15 @@ var Auth=(function(){
     }
   }
 
-  function showApp(name,isAdmin){
-    var ls=document.getElementById('loginScreen'),sh=document.getElementById('shell');
-    if(ls)ls.style.display='none';
-    if(sh)sh.style.display='flex';
-    try{App.init(name,isAdmin);}
-    catch(e){setTimeout(function(){try{App.init(name,isAdmin);}catch(e2){console.error(e2);}},600);}
-  }
+function showApp(name,isAdmin){
+  var init=document.getElementById('initScreen');
+  if(init)init.style.display='none';
+  var ls=document.getElementById('loginScreen'),sh=document.getElementById('shell');
+  if(ls)ls.style.display='none';
+  if(sh)sh.style.display='flex';
+  try{App.init(name,isAdmin);}
+  catch(e){setTimeout(function(){try{App.init(name,isAdmin);}catch(e2){console.error(e2);}},600);}
+}
 
   return{
     initAccounts:initAccounts,getAccounts:getAccounts,saveAccounts:saveAccounts,
