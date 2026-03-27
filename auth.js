@@ -5,8 +5,7 @@ var Auth=(function(){
   function initAccounts(){
     if(Store.get('accounts',null))return;
     var acc={};
-    var src=(typeof TD_A!=='undefined'&&Object.keys(TD_A).length)?TD_A:{};
-    for(var name in src)acc[name]={id:name,pw:'1234',role:'user'};
+    for(var name in TD_A)acc[name]={id:name,pw:'1234',role:'user'};
     acc['김스데반']={id:'김스데반',pw:'1120',role:'admin'};
     Store.set('accounts',acc);
   }
@@ -20,14 +19,11 @@ var Auth=(function(){
     try{
       var v=localStorage.getItem(SK);
       if(v){var o=JSON.parse(v);if(o&&o.n)return{name:o.n,role:o.r||'user'};}
-      var v2=sessionStorage.getItem('gm-session');
-      if(v2){var o2=JSON.parse(v2);if(o2&&o2.name){_save(o2.name,o2.role);sessionStorage.removeItem('gm-session');return{name:o2.name,role:o2.role||'user'};}}
     }catch(e){}
     return null;
   }
   function _clear(){
     try{localStorage.removeItem(SK);}catch(e){}
-    try{sessionStorage.removeItem('gm-session');}catch(e){}
   }
 
   function login(){
@@ -43,20 +39,33 @@ var Auth=(function(){
     _save(fk,found.role);
     showApp(fk,found.role==='admin');
   }
+
   function logout(){_clear();location.reload();}
+
   function tryAutoLogin(){
-    var sess=_load();if(!sess||!sess.name)return false;
+    var sess=_load();
+    if(!sess||!sess.name)return false;
     try{
-      var acc=getAccounts(),role=sess.role;
+      // accounts가 아직 로드 안 됐을 수 있으므로 initAccounts 먼저
+      initAccounts();
+      var acc=getAccounts();
+      var role=sess.role;
       if(acc[sess.name])role=acc[sess.name].role||role;
-      showApp(sess.name,role==='admin');return true;
-    }catch(e){_clear();return false;}
+      showApp(sess.name,role==='admin');
+      return true;
+    }catch(e){
+      console.error('auto login error:',e);
+      _clear();
+      return false;
+    }
   }
+
   function showApp(name,isAdmin){
     var ls=document.getElementById('loginScreen'),sh=document.getElementById('shell');
-    if(ls)ls.style.display='none';if(sh)sh.style.display='flex';
+    if(ls)ls.style.display='none';
+    if(sh)sh.style.display='flex';
     try{App.init(name,isAdmin);}
-    catch(e){setTimeout(function(){try{App.init(name,isAdmin);}catch(e2){}},600);}
+    catch(e){setTimeout(function(){try{App.init(name,isAdmin);}catch(e2){console.error(e2);}},600);}
   }
 
   return{
