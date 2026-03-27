@@ -1,7 +1,4 @@
 // pages/roster.js — 학생 명부
-// 탭1: 📄 명부 PDF  (Google Drive iframe)
-// 탭2: 🔍 학생 검색 (구글 시트 CSV → 카드 + 전화클릭)
-// 탭3: 📝 상담일지  (Firestore 누적, 교사 누구나)
 var PageRoster=(function(){
 
   var ALL_CLS=[
@@ -12,7 +9,7 @@ var PageRoster=(function(){
 
   var _cls   = Store.get('roster-sel-cls','1용1')||'1용1';
   var _tab   = 'pdf';
-  var _cfg   = Store.get('roster-cfg',{});
+  var _cfg   = {};
   var _sheetData = {};
   var _sheetLoading = {};
   var _search = '';
@@ -20,6 +17,11 @@ var PageRoster=(function(){
   var _counsels = null;
   var _counselLoading = false;
   var _detail = null;
+
+  // ★ 항상 최신 cfg 읽기 (Firebase sync 완료 후 반영)
+  function loadCfg(){
+    _cfg = Store.get('roster-cfg',{});
+  }
 
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5);}
@@ -46,7 +48,6 @@ var PageRoster=(function(){
     catch(e){return null;}
   }
 
-  // CSV 파싱
   function parseCSV(text){
     text=(text||'').replace(/\r/g,'');
     var res=[],row=[],cell='',inQ=false;
@@ -61,7 +62,6 @@ var PageRoster=(function(){
     return res;
   }
 
-  // 컬럼 유연 매핑 (나이스 엑셀 형식 포함)
   var FMAP={
     'num':   ['번호','no','num','순번'],
     'name':  ['이름','성명','name'],
@@ -104,7 +104,6 @@ var PageRoster=(function(){
       .catch(function(){_sheetLoading[cls]=false;if(_cls===cls&&_tab==='search')render();});
   }
 
-  // 상담 Firestore
   function counselKey(cls,k){return 'counsel-'+cls+'-'+k;}
   function loadCounsels(cls,k,cb){
     _counselLoading=true;
@@ -130,11 +129,11 @@ var PageRoster=(function(){
     return Store.get('roster-manual-'+cls,[]);
   }
 
-  // ── 렌더 ──
   function render(){
+    loadCfg(); // ★ 매번 최신 cfg 로드
+
     var h='<div class="card" style="padding:0;overflow:hidden">';
 
-    // 학년 탭
     h+='<div style="display:flex;border-bottom:1px solid var(--bd);background:var(--bg2);overflow-x:auto">';
     ['1','2','3'].forEach(function(g){
       var on=_cls.charAt(0)===g;
@@ -145,7 +144,6 @@ var PageRoster=(function(){
     });
     h+='</div>';
 
-    // 반 탭
     var gradeCls=ALL_CLS.filter(function(c){return c.charAt(0)===_cls.charAt(0);});
     h+='<div style="display:flex;gap:5px;padding:8px 12px;border-bottom:1px solid var(--bd);overflow-x:auto">';
     gradeCls.forEach(function(c){
@@ -156,7 +154,6 @@ var PageRoster=(function(){
     });
     h+='</div>';
 
-    // 기능 탭
     h+='<div style="display:flex;border-bottom:1px solid var(--bd)">';
     [{id:'pdf',icon:'📄',label:'명부 PDF'},{id:'search',icon:'🔍',label:'학생 검색'},{id:'counsel',icon:'📝',label:'상담일지'}].forEach(function(t){
       var on=_tab===t.id;
