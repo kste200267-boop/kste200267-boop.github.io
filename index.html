@@ -255,21 +255,22 @@ var PWAInstall=(function(){
   var shell=document.getElementById('shell');
   var started=false;
 
-  function hideInit(){if(initScreen)initScreen.style.display='none'}
+  function hideInit(){if(initScreen)initScreen.style.display='none';}
 
   function showLogin(){
     hideInit();
     loginScreen.style.display='flex';
     shell.style.display='none';
-    try{
-      var sess=JSON.parse(localStorage.getItem('gm-session-v2')||'null');
-      if(sess&&sess.name){var el=document.getElementById('loginId');if(el)el.value=sess.name}
-    }catch(e){}
   }
 
   function showLoading(msg){
-    if(initScreen){var sub=initScreen.querySelector('.sub');if(sub)sub.textContent=msg||'불러오는 중...';initScreen.style.display='flex'}
-    loginScreen.style.display='none';shell.style.display='none';
+    if(initScreen){
+      var sub=initScreen.querySelector('.sub');
+      if(sub)sub.textContent=msg||'불러오는 중...';
+      initScreen.style.display='flex';
+    }
+    loginScreen.style.display='none';
+    shell.style.display='none';
   }
 
   function showError(msg){
@@ -288,7 +289,7 @@ var PWAInstall=(function(){
       if(!Auth.tryAutoLogin()){
         showLogin();
       }else{
-        setTimeout(function(){PWAInstall.checkAfterLogin()},2000);
+        setTimeout(function(){PWAInstall.checkAfterLogin();},2000);
       }
     }catch(e){
       console.error('startApp error:',e);
@@ -298,8 +299,8 @@ var PWAInstall=(function(){
 
   function backgroundRefreshSheets(){
     SheetLoader.loadAll(function(err){
-      if(err){console.error('bg refresh:',err);return}
-      try{Engine.rebuild()}catch(e){}
+      if(err){console.error('bg refresh:',err);return;}
+      try{Engine.rebuild();}catch(e){}
     });
   }
 
@@ -315,50 +316,47 @@ var PWAInstall=(function(){
   }
 
   // Firebase 초기화
-  try{initFirebase()}catch(e){console.error('firebase init error:',e)}
+  try{initFirebase();}catch(e){console.error('firebase init error:',e);}
 
   // 로컬 캐시 로드
   var hasCache=false;
-  try{hasCache=SheetLoader.loadFromCache()}catch(e){}
+  try{hasCache=SheetLoader.loadFromCache();}catch(e){}
 
-  function afterSync(){
+  // ★ 핵심 수정: sync 결과와 무관하게 한 번만 startApp 진입
+  var syncDone=false;
+  var syncTimer=null;
+
+  function proceed(){
+    if(syncDone)return;
+    syncDone=true;
+    if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
+
     if(hasCache){
-      startApp();              // 캐시 있으면 즉시 앱 시작
-      backgroundRefreshSheets(); // 백그라운드로 최신 데이터 갱신
+      startApp();                  // 캐시 있으면 즉시 시작
+      backgroundRefreshSheets();   // 백그라운드 갱신
     }else{
-      firstLoadSheets();       // 캐시 없으면 시트 로드 후 시작
+      firstLoadSheets();           // 캐시 없으면 시트 로드 후 시작
     }
   }
 
-  // Firebase 동기화 - 최대 5초 대기 후 강제 진행
-  var syncDone=false;
-  function doSync(){
-    if(syncDone)return;
-    syncDone=true;
-    afterSync();
-  }
-
-  var syncTimer=setTimeout(function(){
-    console.warn('Firebase sync timeout - proceeding without sync');
-    doSync();
+  // 최대 5초 대기
+  syncTimer=setTimeout(function(){
+    console.warn('Firebase sync timeout - proceeding');
+    proceed();
   },5000);
 
   try{
-    Store.syncFromFirebase(function(){
-      clearTimeout(syncTimer);
-      doSync();
-    });
+    Store.syncFromFirebase(function(){proceed();});
   }catch(e){
     console.error('syncFromFirebase error:',e);
-    clearTimeout(syncTimer);
-    doSync();
+    proceed();
   }
 
   // Service Worker 등록
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js')
-      .then(function(){console.log('SW registered')})
-      .catch(function(e){console.error('SW failed:',e)});
+      .then(function(){console.log('SW registered');})
+      .catch(function(e){console.error('SW failed:',e);});
   }
 })();
 </script>
