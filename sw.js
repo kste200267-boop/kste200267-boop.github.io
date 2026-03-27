@@ -1,7 +1,6 @@
 // sw.js — Service Worker (PWA 오프라인 캐싱)
-var CACHE_NAME='gbgigo-portal-v3';
+var CACHE_NAME='gbgigo-portal-v4';
 
-// 캐싱할 핵심 파일 목록
 var CORE_FILES=[
   './',
   './index.html',
@@ -26,10 +25,10 @@ var CORE_FILES=[
   './pages/tasks.js',
   './pages/admin.js',
   './pages/profile.js',
+  './pages/roster.js',
   './manifest.json'
 ];
 
-// 설치: 핵심 파일 캐싱
 self.addEventListener('install',function(e){
   e.waitUntil(
     caches.open(CACHE_NAME).then(function(cache){
@@ -40,7 +39,6 @@ self.addEventListener('install',function(e){
   );
 });
 
-// 활성화: 오래된 캐시 제거
 self.addEventListener('activate',function(e){
   e.waitUntil(
     caches.keys().then(function(keys){
@@ -54,11 +52,8 @@ self.addEventListener('activate',function(e){
   );
 });
 
-// fetch: 캐시 우선, 실패 시 네트워크
 self.addEventListener('fetch',function(e){
   var url=e.request.url;
-
-  // Google Fonts, Firebase, NEIS API, 구글 시트 → 항상 네트워크 (캐시 안 함)
   if(url.indexOf('fonts.googleapis.com')>=0||
      url.indexOf('googleapis.com')>=0||
      url.indexOf('firestore')>=0||
@@ -73,13 +68,10 @@ self.addEventListener('fetch',function(e){
     );
     return;
   }
-
-  // 그 외: 캐시 우선, 없으면 네트워크 후 캐시 업데이트
   e.respondWith(
     caches.match(e.request).then(function(cached){
       if(cached) return cached;
       return fetch(e.request).then(function(response){
-        // 정상 응답이면 캐시에 저장
         if(response&&response.status===200&&response.type==='basic'){
           var cloned=response.clone();
           caches.open(CACHE_NAME).then(function(cache){
@@ -88,7 +80,6 @@ self.addEventListener('fetch',function(e){
         }
         return response;
       }).catch(function(){
-        // 오프라인 + 캐시 없음: index.html 반환 (SPA 폴백)
         return caches.match('./index.html');
       });
     })
