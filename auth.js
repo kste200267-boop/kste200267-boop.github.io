@@ -1,6 +1,6 @@
 // js/auth.js — 인증 (localStorage 영구 로그인)
 var Auth=(function(){
-  var SK='gm-session-v3';
+  var SK='gm-auto-v1';
 
   function initAccounts(){
     if(Store.get('accounts',null))return;
@@ -18,9 +18,7 @@ var Auth=(function(){
   function _load(){
     try{
       var v=localStorage.getItem(SK);
-      if(!v)return null;
-      var o=JSON.parse(v);
-      if(o&&o.n)return{name:o.n,role:o.r||'user'};
+      if(v){var o=JSON.parse(v);if(o&&o.n)return{name:o.n,role:o.r||'user'};}
     }catch(e){}
     return null;
   }
@@ -48,9 +46,10 @@ var Auth=(function(){
     var sess=_load();
     if(!sess||!sess.name)return false;
     try{
+      // accounts가 아직 로드 안 됐을 수 있으므로 initAccounts 먼저
       initAccounts();
       var acc=getAccounts();
-      var role=sess.role||'user';
+      var role=sess.role;
       if(acc[sess.name])role=acc[sess.name].role||role;
       showApp(sess.name,role==='admin');
       return true;
@@ -62,15 +61,11 @@ var Auth=(function(){
   }
 
   function showApp(name,isAdmin){
-    // ★ initScreen 반드시 숨김
-    var initScreen=document.getElementById('initScreen');
-    if(initScreen)initScreen.style.display='none';
-
     var ls=document.getElementById('loginScreen'),sh=document.getElementById('shell');
     if(ls)ls.style.display='none';
     if(sh)sh.style.display='flex';
     try{App.init(name,isAdmin);}
-    catch(e){setTimeout(function(){try{App.init(name,isAdmin);}catch(e2){}},600);}
+    catch(e){setTimeout(function(){try{App.init(name,isAdmin);}catch(e2){console.error(e2);}},600);}
   }
 
   return{
