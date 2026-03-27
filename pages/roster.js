@@ -1,6 +1,4 @@
-// pages/roster.js — 학생 명부 v2
-// 관리자: 학생 데이터 업로드(CSV/Excel) + 사진 업로드 → Firebase
-// 일반: 조회 + 전화 클릭 + 상담일지
+// pages/roster.js — 학생 명부 v3 (사진: 구글 드라이브 URL)
 var PageRoster=(function(){
 
   var ALL_CLS=[
@@ -30,12 +28,23 @@ var PageRoster=(function(){
   var COLORS=['#1a73e8','#0f9d58','#f4b400','#ea4335','#ab47bc','#00acc1','#ff7043','#795548'];
   function ac(num){return COLORS[(parseInt(num)||0)%COLORS.length];}
 
+  // 구글 드라이브 링크 → 직접 표시 가능한 URL로 변환
+  function toImgUrl(url){
+    if(!url)return '';
+    url=url.trim();
+    // https://drive.google.com/file/d/FILE_ID/view 형식
+    var m=url.match(/\/file\/d\/([^\/\?]+)/);
+    if(m)return 'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w300';
+    // https://drive.google.com/open?id=FILE_ID 형식
+    var m2=url.match(/[?&]id=([^&]+)/);
+    if(m2)return 'https://drive.google.com/thumbnail?id='+m2[1]+'&sz=w300';
+    // 이미 thumbnail URL이면 그대로
+    if(url.indexOf('drive.google.com/thumbnail')>=0)return url;
+    return url;
+  }
+
   function fdb(){
     try{return(typeof firebase!=='undefined'&&firebase.apps&&firebase.apps.length)?firebase.firestore():null;}
-    catch(e){return null;}
-  }
-  function fstorage(){
-    try{return(typeof firebase!=='undefined'&&firebase.apps&&firebase.apps.length)?firebase.storage():null;}
     catch(e){return null;}
   }
 
@@ -61,7 +70,7 @@ var PageRoster=(function(){
       students:students,
       updated:new Date().toISOString(),
       updatedBy:App.getUser()
-    }).then(function(){if(cb)cb();}).catch(function(){toast('저장 실패');});
+    }).then(function(){if(cb)cb();}).catch(function(e){toast('저장 실패: '+e.message);});
   }
 
   function parseCSV(text){
@@ -88,7 +97,8 @@ var PageRoster=(function(){
       pphone1:['보호자전화','보호자전화1','보호자연락처','부모전화','비상연락처'],
       pphone2:['보호자전화2','보호자2','부모전화2'],
       pname:  ['보호자명','보호자이름','보호자','부모님'],
-      addr:   ['주소','address','집주소']
+      addr:   ['주소','address','집주소'],
+      photo:  ['사진','사진url','photo','photourl','이미지','이미지url']
     };
     function findCol(key){
       var cands=COL[key]||[key];
@@ -125,27 +135,6 @@ var PageRoster=(function(){
     reader.readAsArrayBuffer(file);
   }
 
-  function uploadPhoto(cls,studentId,file,cb){
-    var st=fstorage();
-    if(!st){toast('Storage 없음');return;}
-    var ref=st.ref('roster/'+cls+'/'+studentId+'.jpg');
-    var img=new Image();
-    var url=URL.createObjectURL(file);
-    img.onload=function(){
-      var MAX=300,w=img.width,h=img.height;
-      if(w>h){if(w>MAX){h=h*MAX/w;w=MAX;}}else{if(h>MAX){w=w*MAX/h;h=MAX;}}
-      var canvas=document.createElement('canvas');
-      canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      canvas.toBlob(function(blob){
-        ref.put(blob,{contentType:'image/jpeg'}).then(function(){return ref.getDownloadURL();})
-          .then(function(dlUrl){URL.revokeObjectURL(url);cb(dlUrl);})
-          .catch(function(err){toast('업로드 실패: '+err.message);});
-      },'image/jpeg',0.85);
-    };
-    img.src=url;
-  }
-
   function counselKey(cls,k){return 'counsel-'+cls+'-'+k;}
   function loadCounsels(cls,k,cb){
     _counselLoading=true;
@@ -161,10 +150,22 @@ var PageRoster=(function(){
       .then(function(){if(cb)cb();}).catch(function(){toast('저장 실패');});
   }
 
+  // 사진 아바타 HTML
+  function avatarHtml(s,size){
+    var sz=size||48;
+    var imgUrl=toImgUrl(s.photo||'');
+    if(imgUrl){
+      return '<img src="'+esc(imgUrl)+'" style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;object-fit:cover;margin:0 auto '+(sz>50?'8':'5')+'px;display:block;border:2px solid rgba(255,255,255,.4)" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'">'
+        +'<div style="display:none;width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+ac(s.num)+';color:#fff;align-items:center;justify-content:center;font-size:'+(sz>50?'1.8':'1.1')+'em;font-weight:700;margin:0 auto '+(sz>50?'8':'5')+'px">'+esc(s.name?s.name.charAt(0):'?')+'</div>';
+    }
+    return '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+ac(s.num)+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:'+(sz>50?'1.8':'1.1')+'em;font-weight:700;margin:0 auto '+(sz>50?'8':'5')+'px">'+esc(s.name?s.name.charAt(0):'?')+'</div>';
+  }
+
   function render(){
     loadCfg();
     var h='<div class="card" style="padding:0;overflow:hidden">';
 
+    // 학년 탭
     h+='<div style="display:flex;border-bottom:1px solid var(--bd);background:var(--bg2);overflow-x:auto">';
     ['1','2','3'].forEach(function(g){
       var on=_cls.charAt(0)===g;
@@ -175,6 +176,7 @@ var PageRoster=(function(){
     });
     h+='</div>';
 
+    // 반 탭
     var gradeCls=ALL_CLS.filter(function(c){return c.charAt(0)===_cls.charAt(0);});
     h+='<div style="display:flex;gap:5px;padding:8px 12px;border-bottom:1px solid var(--bd);overflow-x:auto">';
     gradeCls.forEach(function(c){
@@ -183,6 +185,7 @@ var PageRoster=(function(){
     });
     h+='</div>';
 
+    // 기능 탭
     h+='<div style="display:flex;border-bottom:1px solid var(--bd)">';
     [{id:'list',icon:'👥',label:'명부'},{id:'counsel',icon:'📝',label:'상담일지'}].forEach(function(t){
       var on=_tab===t.id;
@@ -234,8 +237,7 @@ var PageRoster=(function(){
       var idx=students.indexOf(s);
       var hasPhone=!!(s.pphone1||s.pphone2||s.sphone);
       h+='<div onclick="PageRoster.showDetail('+idx+')" style="background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;box-shadow:var(--shadow);transition:all .15s" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">';
-      if(s.photo){h+='<img src="'+esc(s.photo)+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover;margin:0 auto 5px;display:block;border:2px solid var(--bd)">';}
-      else{h+='<div style="width:48px;height:48px;border-radius:50%;background:'+ac(s.num)+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.1em;font-weight:700;margin:0 auto 5px">'+esc(s.name?s.name.charAt(0):'?')+'</div>';}
+      h+=avatarHtml(s,48);
       h+='<div style="font-weight:700;font-size:.83em;word-break:keep-all">'+esc(s.name||'')+'</div>';
       h+='<div style="font-size:.72em;color:var(--tx2)">'+esc(s.num||'')+'번</div>';
       if(hasPhone)h+='<div style="font-size:.62em;color:var(--green);margin-top:2px">📞</div>';
@@ -248,13 +250,9 @@ var PageRoster=(function(){
     var h='<div style="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px" onclick="PageRoster.closeDetail()">';
     h+='<div style="background:var(--bg);border-radius:var(--radius);width:100%;max-width:360px;overflow:hidden;max-height:90vh;overflow-y:auto" onclick="event.stopPropagation()">';
     h+='<div style="background:linear-gradient(135deg,'+ac(s.num)+','+ac((parseInt(s.num)||0)+3)+');padding:22px;text-align:center;color:#fff">';
-    if(s.photo){h+='<img src="'+esc(s.photo)+'" style="width:70px;height:70px;border-radius:50%;object-fit:cover;margin:0 auto 8px;display:block;border:3px solid rgba(255,255,255,.5)">';}
-    else{h+='<div style="width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:1.8em;font-weight:700;margin:0 auto 8px">'+esc(s.name?s.name.charAt(0):'?')+'</div>';}
+    h+=avatarHtml(s,70);
     h+='<div style="font-size:1.15em;font-weight:700">'+esc(s.name||'')+'</div>';
     h+='<div style="font-size:.82em;opacity:.8;margin-top:3px">'+esc(_cls)+' '+esc(s.num||'')+'번</div>';
-    if(App.isAdmin()){
-      h+='<label style="display:inline-block;margin-top:8px;padding:4px 12px;border-radius:20px;background:rgba(255,255,255,.2);font-size:.75em;cursor:pointer">📷 사진 변경<input type="file" accept="image/*" style="display:none" onchange="PageRoster.uploadStudentPhoto(\''+esc(s.id)+'\',this)"></label>';
-    }
     h+='</div>';
     h+='<div style="padding:14px">';
     [['🏠 주소',s.addr,false],['👨‍👩‍👧 보호자',s.pname,false],['📞 보호자전화1',s.pphone1,true],['📞 보호자전화2',s.pphone2,true],['📱 학생전화',s.sphone,true]].forEach(function(r){
@@ -265,6 +263,14 @@ var PageRoster=(function(){
       else h+='<div style="font-size:.88em;word-break:keep-all;line-height:1.4">'+esc(r[1])+'</div>';
       h+='</div>';
     });
+    // 관리자: 사진 URL 수정
+    if(App.isAdmin()){
+      h+='<div style="margin-top:10px;padding:10px;background:var(--bg2);border-radius:8px">';
+      h+='<div style="font-size:.77em;color:var(--tx2);margin-bottom:4px">📷 사진 URL (구글 드라이브 공유 링크)</div>';
+      h+='<input class="ti-input" id="photoUrlInput" value="'+esc(s.photo||'')+'" placeholder="https://drive.google.com/file/d/..." style="font-size:.8em;margin-bottom:6px">';
+      h+='<button class="a-btn primary sm" onclick="PageRoster.savePhotoUrl(\''+esc(s.id)+'\')">사진 URL 저장</button>';
+      h+='</div>';
+    }
     if(s.pphone1){var cp=s.pphone1.replace(/[^0-9]/g,'');h+='<a href="tel:'+cp+'" style="display:block;margin-top:12px;padding:11px;background:var(--green);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📞 보호자 전화1</a>';}
     if(s.pphone2){var cp2=s.pphone2.replace(/[^0-9]/g,'');h+='<a href="tel:'+cp2+'" style="display:block;margin-top:6px;padding:11px;background:var(--cyan);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📞 보호자 전화2</a>';}
     if(s.sphone){var cs=s.sphone.replace(/[^0-9]/g,'');h+='<a href="tel:'+cs+'" style="display:block;margin-top:6px;padding:11px;background:var(--blue);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📱 학생 전화</a>';}
@@ -280,39 +286,53 @@ var PageRoster=(function(){
     var h='<div style="padding:16px">';
     h+='<div style="font-weight:700;font-size:.95em;margin-bottom:14px">📤 '+_cls+' 학생 데이터 관리</div>';
 
+    // CSV 양식
     h+='<div style="padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px">';
     h+='<div style="font-weight:600;font-size:.85em;margin-bottom:6px">1단계: CSV 양식 다운로드</div>';
-    h+='<div style="font-size:.78em;color:var(--tx2);margin-bottom:8px">양식에 학생 정보 입력 후 저장. Excel(.xlsx)도 바로 업로드 가능합니다.</div>';
+    h+='<div style="font-size:.78em;color:var(--tx2);margin-bottom:8px;line-height:1.7">';
+    h+='컬럼: 번호, 이름, 학생전화, 보호자전화1, 보호자전화2, 보호자명, 주소, <b>사진URL</b><br>';
+    h+='사진URL: 구글 드라이브 → 사진 우클릭 → 공유 → "링크 있는 모든 사용자" → 링크 복사';
+    h+='</div>';
     h+='<button class="a-btn primary" onclick="PageRoster.downloadTemplate()">📥 CSV 양식 다운로드</button>';
     h+='</div>';
 
+    // 파일 업로드
     h+='<div style="padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px">';
     h+='<div style="font-weight:600;font-size:.85em;margin-bottom:6px">2단계: 파일 업로드 (CSV 또는 Excel)</div>';
     h+='<input type="file" id="rosterFile" accept=".csv,.xlsx,.xls" style="margin-bottom:8px;font-size:.85em"><br>';
     h+='<button class="a-btn primary" onclick="PageRoster.uploadFile()">📤 업로드 및 저장</button>';
     h+='</div>';
 
+    // 현재 학생 목록
     if(students.length){
       h+='<div style="padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px">';
       h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
       h+='<div style="font-weight:600;font-size:.85em">현재 등록 ('+students.length+'명)</div>';
       h+='<button class="a-btn danger sm" onclick="PageRoster.clearStudents()">전체 삭제</button></div>';
-      h+='<div style="max-height:280px;overflow-y:auto"><table class="a-table" style="font-size:.78em"><thead><tr><th>번호</th><th>이름</th><th>학생전화</th><th>보호자1</th><th>보호자2</th><th>사진</th><th></th></tr></thead><tbody>';
+      h+='<div style="max-height:300px;overflow-y:auto">';
+      h+='<table class="a-table" style="font-size:.78em"><thead><tr><th>번호</th><th>이름</th><th>학생전화</th><th>보호자1</th><th>보호자2</th><th>사진</th><th></th></tr></thead><tbody>';
       students.forEach(function(s,i){
+        var imgUrl=toImgUrl(s.photo||'');
         h+='<tr><td>'+esc(s.num||'')+'</td><td style="font-weight:600">'+esc(s.name||'')+'</td>';
         h+='<td>'+esc(s.sphone||'')+'</td><td>'+esc(s.pphone1||'')+'</td><td>'+esc(s.pphone2||'')+'</td>';
         h+='<td style="text-align:center">';
-        if(s.photo){h+='<img src="'+esc(s.photo)+'" style="width:28px;height:28px;border-radius:50%;object-fit:cover">';}
-        else{h+='<label style="cursor:pointer;font-size:.8em;color:var(--blue)">+사진<input type="file" accept="image/*" style="display:none" onchange="PageRoster.uploadStudentPhoto(\''+esc(s.id)+'\',this)"></label>';}
-        h+='</td><td><button class="a-btn danger sm" onclick="PageRoster.deleteStu('+i+')">✕</button></td></tr>';
+        if(imgUrl)h+='<img src="'+esc(imgUrl)+'" style="width:28px;height:28px;border-radius:50%;object-fit:cover">';
+        else h+='<span style="color:var(--tx3);font-size:.8em">없음</span>';
+        h+='</td>';
+        h+='<td><button class="a-btn danger sm" onclick="PageRoster.deleteStu('+i+')">✕</button></td></tr>';
       });
       h+='</tbody></table></div></div>';
     }
 
-    h+='<div style="padding:12px;background:#fff3e0;border-radius:8px;border-left:3px solid var(--orange)">';
-    h+='<div style="font-weight:600;font-size:.85em;margin-bottom:4px">📷 사진 업로드</div>';
-    h+='<div style="font-size:.78em;color:var(--tx2);line-height:1.8">① 위 목록 <b>+사진</b> 클릭 → 파일 선택<br>② 명부에서 학생 클릭 → <b>📷 사진 변경</b></div>';
-    h+='</div></div>';
+    // 사진 URL 안내
+    h+='<div style="padding:12px;background:#e8f5e9;border-radius:8px;border-left:3px solid var(--green)">';
+    h+='<div style="font-weight:600;font-size:.85em;margin-bottom:6px">📷 구글 드라이브 사진 등록 방법</div>';
+    h+='<div style="font-size:.78em;color:var(--tx2);line-height:1.9">';
+    h+='① 구글 드라이브에 사진 업로드<br>';
+    h+='② 사진 우클릭 → <b>공유</b> → "링크 있는 모든 사용자" 설정<br>';
+    h+='③ 링크 복사 → CSV의 <b>사진URL</b> 컬럼에 붙여넣기<br>';
+    h+='④ 또는 명부에서 학생 카드 클릭 → <b>사진 URL 저장</b>으로 개별 등록';
+    h+='</div></div></div>';
     return h;
   }
 
@@ -368,9 +388,9 @@ var PageRoster=(function(){
     showDetail:function(idx){_detail=(_students[_cls]||[])[idx]||null;render();},
     closeDetail:function(){_detail=null;render();},
     downloadTemplate:function(){
-      var csv='\uFEFF번호,이름,학생전화,보호자전화1,보호자전화2,보호자명,주소\n';
-      csv+='1,홍길동,010-1234-5678,010-9876-5432,010-1111-2222,홍아버지,경북 구미시\n';
-      csv+='2,김철수,010-2222-3333,010-4444-5555,,김어머니,경북 구미시\n';
+      var csv='\uFEFF번호,이름,학생전화,보호자전화1,보호자전화2,보호자명,주소,사진URL\n';
+      csv+='1,홍길동,010-1234-5678,010-9876-5432,010-1111-2222,홍아버지,경북 구미시,https://drive.google.com/file/d/예시ID/view\n';
+      csv+='2,김철수,010-2222-3333,010-4444-5555,,김어머니,경북 구미시,\n';
       var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
       var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=_cls+'_학생명부_양식.csv';a.click();
     },
@@ -381,7 +401,10 @@ var PageRoster=(function(){
       function saveWithPhotoPreserve(students){
         var existing=_students[_cls]||[],photoMap={};
         existing.forEach(function(s){if(s.photo)photoMap[(s.num||'')+'-'+(s.name||'')]=s.photo;});
-        students.forEach(function(s){var k=(s.num||'')+'-'+(s.name||'');if(photoMap[k])s.photo=photoMap[k];});
+        students.forEach(function(s){
+          var k=(s.num||'')+'-'+(s.name||'');
+          if(!s.photo&&photoMap[k])s.photo=photoMap[k];
+        });
         saveStudents(_cls,students,function(){toast(students.length+'명 저장됨');render();});
       }
       if(name.endsWith('.csv')){
@@ -393,30 +416,32 @@ var PageRoster=(function(){
         };
         reader.readAsText(f,'UTF-8');
       }else if(name.endsWith('.xlsx')||name.endsWith('.xls')){
+        function doExcel(){
+          parseExcel(f,function(students){
+            if(!students.length){toast('데이터 없음');return;}
+            saveWithPhotoPreserve(students);
+          });
+        }
         if(typeof XLSX==='undefined'){
-          // SheetJS 동적 로드
           var script=document.createElement('script');
           script.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-          script.onload=function(){parseExcel(f,function(students){if(!students.length){toast('데이터 없음');return;}saveWithPhotoPreserve(students);});};
+          script.onload=doExcel;
           document.head.appendChild(script);
           toast('Excel 라이브러리 로딩 중...');
-        }else{
-          parseExcel(f,function(students){if(!students.length){toast('데이터 없음');return;}saveWithPhotoPreserve(students);});
-        }
+        }else{doExcel();}
       }else{toast('CSV 또는 Excel 파일만 지원');}
     },
-    uploadStudentPhoto:function(studentId,input){
-      var file=input.files[0];if(!file)return;
+    savePhotoUrl:function(studentId){
+      var input=document.getElementById('photoUrlInput');
+      if(!input)return;
+      var url=input.value.trim();
       var students=_students[_cls]||[];
       var target=null;
       for(var i=0;i<students.length;i++){if(students[i].id===studentId){target=students[i];break;}}
       if(!target){toast('학생을 찾을 수 없습니다');return;}
-      toast('업로드 중...');
-      uploadPhoto(_cls,studentId,file,function(url){
-        target.photo=url;
-        if(_detail&&_detail.id===studentId)_detail.photo=url;
-        saveStudents(_cls,students,function(){toast('사진 저장됨');render();});
-      });
+      target.photo=url;
+      if(_detail&&_detail.id===studentId)_detail.photo=url;
+      saveStudents(_cls,students,function(){toast('사진 URL 저장됨');render();});
     },
     deleteStu:function(idx){
       if(!confirm('삭제할까요?'))return;
