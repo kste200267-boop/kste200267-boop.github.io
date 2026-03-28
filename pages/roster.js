@@ -1,4 +1,4 @@
-// pages/roster.js — 학생 명부 v3 (사진: 구글 드라이브 URL)
+// pages/roster.js — 학생 명부 v4 (CSV: 번호,이름,주소,본인휴대폰,어머니휴대폰,아버지휴대폰,사진URL)
 var PageRoster=(function(){
 
   var ALL_CLS=[
@@ -28,17 +28,17 @@ var PageRoster=(function(){
   var COLORS=['#1a73e8','#0f9d58','#f4b400','#ea4335','#ab47bc','#00acc1','#ff7043','#795548'];
   function ac(num){return COLORS[(parseInt(num)||0)%COLORS.length];}
 
-  // 구글 드라이브 링크 → 직접 표시 가능한 URL로 변환
+  // 구글 드라이브 링크 → 이미지 직접 표시 URL
   function toImgUrl(url){
     if(!url)return '';
     url=url.trim();
-    // https://drive.google.com/file/d/FILE_ID/view 형식
-    var m=url.match(/\/file\/d\/([^\/\?]+)/);
-    if(m)return 'https://drive.google.com/thumbnail?id='+m[1]+'&sz=w300';
-    // https://drive.google.com/open?id=FILE_ID 형식
-    var m2=url.match(/[?&]id=([^&]+)/);
-    if(m2)return 'https://drive.google.com/thumbnail?id='+m2[1]+'&sz=w300';
-    // 이미 thumbnail URL이면 그대로
+    // https://drive.google.com/uc?id=FILE_ID&export=view (업로더 출력 형식)
+    var m0=url.match(/[?&]id=([^&]+)/);
+    if(m0)return 'https://drive.google.com/thumbnail?id='+m0[1]+'&sz=w300';
+    // https://drive.google.com/file/d/FILE_ID/view
+    var m1=url.match(/\/file\/d\/([^\/\?]+)/);
+    if(m1)return 'https://drive.google.com/thumbnail?id='+m1[1]+'&sz=w300';
+    // 이미 thumbnail URL
     if(url.indexOf('drive.google.com/thumbnail')>=0)return url;
     return url;
   }
@@ -90,16 +90,22 @@ var PageRoster=(function(){
   function csvToStudents(rows){
     if(rows.length<2)return[];
     var cols=rows[0].map(function(c){return c.trim().toLowerCase().replace(/\s/g,'');});
+
+    // ★ 컬럼 매핑: 번호,이름,주소,본인휴대폰,어머니휴대폰,아버지휴대폰,사진URL
     var COL={
       num:    ['번호','no','num','순번'],
       name:   ['이름','성명','name'],
-      sphone: ['본인휴대폰','학생전화','전화','phone','연락처','본인연락처','휴대폰'],
-      pphone1:['보호자전화','보호자전화1','보호자연락처','부모전화','비상연락처'],
-      pphone2:['보호자전화2','보호자2','부모전화2'],
-      pname:  ['보호자명','보호자이름','보호자','부모님'],
       addr:   ['주소','address','집주소'],
-      photo:  ['사진','사진url','photo','photourl','이미지','이미지url']
+      sphone: ['본인휴대폰','본인전화','학생전화','전화','phone','연락처','본인연락처','휴대폰'],
+      mphone: ['어머니휴대폰','어머니전화','모전화','모연락처','어머니'],
+      fphone: ['아버지휴대폰','아버지전화','부전화','부연락처','아버지'],
+      // 구버전 호환
+      pphone1:['보호자전화','보호자전화1','보호자연락처','비상연락처'],
+      pphone2:['보호자전화2','보호자2'],
+      pname:  ['보호자명','보호자이름','보호자','부모님'],
+      photo:  ['사진url','사진','photo','photourl','이미지url','이미지']
     };
+
     function findCol(key){
       var cands=COL[key]||[key];
       for(var i=0;i<cands.length;i++){
@@ -110,6 +116,7 @@ var PageRoster=(function(){
     }
     var idxMap={};
     for(var k in COL)idxMap[k]=findCol(k);
+
     var students=[];
     for(var i=1;i<rows.length;i++){
       var r=rows[i];
@@ -235,7 +242,7 @@ var PageRoster=(function(){
     h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px">';
     filtered.forEach(function(s){
       var idx=students.indexOf(s);
-      var hasPhone=!!(s.pphone1||s.pphone2||s.sphone);
+      var hasPhone=!!(s.mphone||s.fphone||s.sphone||s.pphone1||s.pphone2);
       h+='<div onclick="PageRoster.showDetail('+idx+')" style="background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;box-shadow:var(--shadow);transition:all .15s" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'\'">';
       h+=avatarHtml(s,48);
       h+='<div style="font-weight:700;font-size:.83em;word-break:keep-all">'+esc(s.name||'')+'</div>';
@@ -255,7 +262,19 @@ var PageRoster=(function(){
     h+='<div style="font-size:.82em;opacity:.8;margin-top:3px">'+esc(_cls)+' '+esc(s.num||'')+'번</div>';
     h+='</div>';
     h+='<div style="padding:14px">';
-    [['🏠 주소',s.addr,false],['👨‍👩‍👧 보호자',s.pname,false],['📞 보호자전화1',s.pphone1,true],['📞 보호자전화2',s.pphone2,true],['📱 학생전화',s.sphone,true]].forEach(function(r){
+
+    // ★ 상세 정보: 새 컬럼 구조 우선, 구버전 호환
+    var rows=[
+      ['🏠 주소', s.addr, false],
+      ['📱 본인휴대폰', s.sphone, true],
+      ['👩 어머니휴대폰', s.mphone, true],
+      ['👨 아버지휴대폰', s.fphone, true],
+      // 구버전 호환
+      ['👨‍👩‍👧 보호자', s.pname, false],
+      ['📞 보호자전화1', s.pphone1, true],
+      ['📞 보호자전화2', s.pphone2, true],
+    ];
+    rows.forEach(function(r){
       if(!r[1])return;
       h+='<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--bg2)">';
       h+='<div style="font-size:.77em;color:var(--tx2);min-width:90px;flex-shrink:0">'+r[0]+'</div>';
@@ -263,17 +282,24 @@ var PageRoster=(function(){
       else h+='<div style="font-size:.88em;word-break:keep-all;line-height:1.4">'+esc(r[1])+'</div>';
       h+='</div>';
     });
+
     // 관리자: 사진 URL 수정
     if(App.isAdmin()){
       h+='<div style="margin-top:10px;padding:10px;background:var(--bg2);border-radius:8px">';
-      h+='<div style="font-size:.77em;color:var(--tx2);margin-bottom:4px">📷 사진 URL (구글 드라이브 공유 링크)</div>';
-      h+='<input class="ti-input" id="photoUrlInput" value="'+esc(s.photo||'')+'" placeholder="https://drive.google.com/file/d/..." style="font-size:.8em;margin-bottom:6px">';
+      h+='<div style="font-size:.77em;color:var(--tx2);margin-bottom:4px">📷 사진 URL (구글 드라이브 업로더 CSV URL 또는 공유 링크)</div>';
+      h+='<input class="ti-input" id="photoUrlInput" value="'+esc(s.photo||'')+'" placeholder="https://drive.google.com/uc?id=..." style="font-size:.8em;margin-bottom:6px">';
       h+='<button class="a-btn primary sm" onclick="PageRoster.savePhotoUrl(\''+esc(s.id)+'\')">사진 URL 저장</button>';
       h+='</div>';
     }
-    if(s.pphone1){var cp=s.pphone1.replace(/[^0-9]/g,'');h+='<a href="tel:'+cp+'" style="display:block;margin-top:12px;padding:11px;background:var(--green);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📞 보호자 전화1</a>';}
-    if(s.pphone2){var cp2=s.pphone2.replace(/[^0-9]/g,'');h+='<a href="tel:'+cp2+'" style="display:block;margin-top:6px;padding:11px;background:var(--cyan);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📞 보호자 전화2</a>';}
-    if(s.sphone){var cs=s.sphone.replace(/[^0-9]/g,'');h+='<a href="tel:'+cs+'" style="display:block;margin-top:6px;padding:11px;background:var(--blue);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📱 학생 전화</a>';}
+
+    // 전화 버튼 — 새 컬럼 우선
+    if(s.sphone){var cs=s.sphone.replace(/[^0-9]/g,'');h+='<a href="tel:'+cs+'" style="display:block;margin-top:12px;padding:11px;background:var(--blue);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📱 본인 전화</a>';}
+    if(s.mphone){var cm=s.mphone.replace(/[^0-9]/g,'');h+='<a href="tel:'+cm+'" style="display:block;margin-top:6px;padding:11px;background:#e91e8c;color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">👩 어머니 전화</a>';}
+    if(s.fphone){var cf=s.fphone.replace(/[^0-9]/g,'');h+='<a href="tel:'+cf+'" style="display:block;margin-top:6px;padding:11px;background:#0f9d58;color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">👨 아버지 전화</a>';}
+    // 구버전 호환
+    if(!s.mphone&&!s.fphone&&s.pphone1){var cp=s.pphone1.replace(/[^0-9]/g,'');h+='<a href="tel:'+cp+'" style="display:block;margin-top:12px;padding:11px;background:var(--green);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📞 보호자 전화1</a>';}
+    if(!s.mphone&&!s.fphone&&s.pphone2){var cp2=s.pphone2.replace(/[^0-9]/g,'');h+='<a href="tel:'+cp2+'" style="display:block;margin-top:6px;padding:11px;background:var(--cyan);color:#fff;border-radius:8px;text-align:center;font-weight:700;font-size:.9em;text-decoration:none">📞 보호자 전화2</a>';}
+
     var key=(s.num||'')+'-'+(s.name||'');
     h+='<button onclick="PageRoster.goToCounsel(\''+esc(key)+'\')" style="display:block;width:100%;margin-top:6px;padding:11px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);cursor:pointer;font-size:.88em;font-weight:600">📝 상담일지 보기</button>';
     h+='<button onclick="PageRoster.closeDetail()" style="display:block;width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);cursor:pointer;font-size:.85em">닫기</button>';
@@ -290,8 +316,9 @@ var PageRoster=(function(){
     h+='<div style="padding:12px;background:var(--bg2);border-radius:8px;margin-bottom:12px">';
     h+='<div style="font-weight:600;font-size:.85em;margin-bottom:6px">1단계: CSV 양식 다운로드</div>';
     h+='<div style="font-size:.78em;color:var(--tx2);margin-bottom:8px;line-height:1.7">';
-    h+='컬럼: 번호, 이름, 학생전화, 보호자전화1, 보호자전화2, 보호자명, 주소, <b>사진URL</b><br>';
-    h+='사진URL: 구글 드라이브 → 사진 우클릭 → 공유 → "링크 있는 모든 사용자" → 링크 복사';
+    // ★ 컬럼 순서 표시 변경
+    h+='컬럼: <b>번호, 이름, 주소, 본인휴대폰, 어머니휴대폰, 아버지휴대폰, 사진URL</b><br>';
+    h+='사진URL: 명부 업로더(<b>roster-uploader.html</b>)로 자동 생성됩니다';
     h+='</div>';
     h+='<button class="a-btn primary" onclick="PageRoster.downloadTemplate()">📥 CSV 양식 다운로드</button>';
     h+='</div>';
@@ -310,11 +337,13 @@ var PageRoster=(function(){
       h+='<div style="font-weight:600;font-size:.85em">현재 등록 ('+students.length+'명)</div>';
       h+='<button class="a-btn danger sm" onclick="PageRoster.clearStudents()">전체 삭제</button></div>';
       h+='<div style="max-height:300px;overflow-y:auto">';
-      h+='<table class="a-table" style="font-size:.78em"><thead><tr><th>번호</th><th>이름</th><th>학생전화</th><th>보호자1</th><th>보호자2</th><th>사진</th><th></th></tr></thead><tbody>';
+      h+='<table class="a-table" style="font-size:.78em"><thead><tr><th>번호</th><th>이름</th><th>본인</th><th>어머니</th><th>아버지</th><th>사진</th><th></th></tr></thead><tbody>';
       students.forEach(function(s,i){
         var imgUrl=toImgUrl(s.photo||'');
         h+='<tr><td>'+esc(s.num||'')+'</td><td style="font-weight:600">'+esc(s.name||'')+'</td>';
-        h+='<td>'+esc(s.sphone||'')+'</td><td>'+esc(s.pphone1||'')+'</td><td>'+esc(s.pphone2||'')+'</td>';
+        h+='<td>'+esc(s.sphone||'')+'</td>';
+        h+='<td>'+esc(s.mphone||s.pphone1||'')+'</td>';
+        h+='<td>'+esc(s.fphone||s.pphone2||'')+'</td>';
         h+='<td style="text-align:center">';
         if(imgUrl)h+='<img src="'+esc(imgUrl)+'" style="width:28px;height:28px;border-radius:50%;object-fit:cover">';
         else h+='<span style="color:var(--tx3);font-size:.8em">없음</span>';
@@ -324,14 +353,14 @@ var PageRoster=(function(){
       h+='</tbody></table></div></div>';
     }
 
-    // 사진 URL 안내
-    h+='<div style="padding:12px;background:#e8f5e9;border-radius:8px;border-left:3px solid var(--green)">';
-    h+='<div style="font-weight:600;font-size:.85em;margin-bottom:6px">📷 구글 드라이브 사진 등록 방법</div>';
+    // 업로더 안내
+    h+='<div style="padding:12px;background:rgba(79,142,247,.08);border-radius:8px;border-left:3px solid var(--blue)">';
+    h+='<div style="font-weight:600;font-size:.85em;margin-bottom:6px">📷 사진 포함 명부 등록 방법</div>';
     h+='<div style="font-size:.78em;color:var(--tx2);line-height:1.9">';
-    h+='① 구글 드라이브에 사진 업로드<br>';
-    h+='② 사진 우클릭 → <b>공유</b> → "링크 있는 모든 사용자" 설정<br>';
-    h+='③ 링크 복사 → CSV의 <b>사진URL</b> 컬럼에 붙여넣기<br>';
-    h+='④ 또는 명부에서 학생 카드 클릭 → <b>사진 URL 저장</b>으로 개별 등록';
+    h+='① <b>roster-uploader.html</b> 열기<br>';
+    h+='② 반 선택 → CSV 업로드 → 사진 붙여넣기(Ctrl+V)<br>';
+    h+='③ 구글 로그인 → 드라이브에 업로드 시작<br>';
+    h+='④ 완료 후 CSV URL 복사 → 여기 2단계에서 업로드';
     h+='</div></div></div>';
     return h;
   }
@@ -387,10 +416,11 @@ var PageRoster=(function(){
     setSearch:function(v){_search=v;render();},
     showDetail:function(idx){_detail=(_students[_cls]||[])[idx]||null;render();},
     closeDetail:function(){_detail=null;render();},
+    // ★ CSV 양식: 번호,이름,주소,본인휴대폰,어머니휴대폰,아버지휴대폰,사진URL
     downloadTemplate:function(){
-      var csv='\uFEFF번호,이름,학생전화,보호자전화1,보호자전화2,보호자명,주소,사진URL\n';
-      csv+='1,홍길동,010-1234-5678,010-9876-5432,010-1111-2222,홍아버지,경북 구미시,https://drive.google.com/file/d/예시ID/view\n';
-      csv+='2,김철수,010-2222-3333,010-4444-5555,,김어머니,경북 구미시,\n';
+      var csv='\uFEFF번호,이름,주소,본인휴대폰,어머니휴대폰,아버지휴대폰,사진URL\n';
+      csv+='1,홍길동,경북 경산시,010-1234-5678,010-9876-5432,010-1111-2222,https://drive.google.com/uc?id=예시ID&export=view\n';
+      csv+='2,김철수,경북 경산시,010-2222-3333,010-4444-5555,,\n';
       var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
       var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=_cls+'_학생명부_양식.csv';a.click();
     },
