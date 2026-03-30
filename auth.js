@@ -93,14 +93,7 @@ var Auth=(function(){
       if(acc[k].id===id){found=acc[k];fk=k;break;}
     }
     if(!found){errEl.textContent='존재하지 않는 아이디입니다';return;}
-if(found.pw!==hashPw(pw)&&found.pw!==pw){errEl.textContent='비밀번호가 틀렸습니다';return;}
-// 평문이면 자동으로 해시 변환
-if(found.pw===pw){
-  found.pw=hashPw(pw);
-  var accTemp=getAccounts();
-  accTemp[fk].pw=hashPw(pw);
-  saveAccounts(accTemp);
-}
+    if(found.pw!==hashPw(pw)){errEl.textContent='비밀번호가 틀렸습니다';return;}
 
     errEl.textContent='';
     saveSession(fk,found.role);
