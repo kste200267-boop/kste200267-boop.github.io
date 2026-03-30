@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="ko">
-  <meta http-equiv="X-Content-Type-Options" content="nosniff">
-<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
-</head>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<!-- ★ 보안 메타 (올바른 위치) -->
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <title>경북기계금속고등학교 교사포털</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a73e8">
@@ -30,7 +30,6 @@
   border-radius:50%;animation:spin .8s linear infinite;margin-top:4px;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
-/* PWA 설치 배너 */
 #pwaBar{
   display:none;position:fixed;bottom:0;left:0;right:0;z-index:8000;
   background:#fff;border-top:1px solid #e0e0e0;box-shadow:0 -2px 12px rgba(0,0,0,.1);
@@ -47,7 +46,6 @@
 .pwa-btn-install{padding:8px 16px;border-radius:8px;border:none;background:#1a73e8;color:#fff;font-size:.83em;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:'Noto Sans KR',system-ui,sans-serif}
 .pwa-btn-install:active{opacity:.85}
 .pwa-btn-close{background:none;border:none;font-size:1.3em;cursor:pointer;color:#9aa0a6;padding:0 2px;flex-shrink:0;line-height:1}
-/* iOS 안내 */
 #iosGuide{
   display:none;position:fixed;bottom:0;left:0;right:0;z-index:8000;
   background:#1c1c1e;color:#fff;border-radius:16px 16px 0 0;
@@ -80,17 +78,17 @@
     <div class="login-title">🏫 경북기계금속고등학교</div>
     <div class="login-sub">교사 업무 포털</div>
     <div class="login-form">
+      <!-- ★ maxlength 추가 -->
       <input type="text" class="form-input" id="loginId"
-  placeholder="아이디 (이름)"
-  autocomplete="username"
-  maxlength="50">
-
-<input type="password" class="form-input" id="loginPw"
-  placeholder="비밀번호"
-  style="margin-top:8px"
-  autocomplete="current-password"
-  maxlength="100"
-  onkeydown="if(event.key==='Enter')Auth.login()">
+        placeholder="아이디 (이름)"
+        autocomplete="username"
+        maxlength="50">
+      <input type="password" class="form-input" id="loginPw"
+        placeholder="비밀번호"
+        style="margin-top:8px"
+        autocomplete="current-password"
+        maxlength="100"
+        onkeydown="if(event.key==='Enter')Auth.login()">
       <button class="btn-login" onclick="Auth.login()">로그인</button>
       <div id="loginErr" class="login-err"></div>
     </div>
@@ -149,7 +147,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <!-- 데이터 -->
 <script src="data/constants.js"></script>
 <script src="data/sheet-loader.js"></script>
@@ -171,8 +169,10 @@
 <script src="pages/schedule.js"></script>
 <script src="pages/tasks.js"></script>
 <script src="pages/admin.js"></script>
+<!-- ★ 비밀번호 해시 패치 (admin.js 다음) -->
+<script src="pages/admin-patch.js"></script>
 <script src="pages/profile.js"></script>
-  <script src="pages/roster.js"></script>
+<script src="pages/roster.js"></script>
 
 <script>
 // ═══════════════════
@@ -298,12 +298,12 @@ var PWAInstall=(function(){
       var savedPT=Store.get('pt');if(savedPT)PT=savedPT;
       Auth.initAccounts();
       Engine.rebuild();
-if(!Auth.tryAutoLogin()){
-  showLogin();
-}else{
-  hideInit(); // ★ 이 한 줄 추가
-  setTimeout(function(){PWAInstall.checkAfterLogin();},2000);
-}
+      if(!Auth.tryAutoLogin()){
+        showLogin();
+      }else{
+        hideInit();
+        setTimeout(function(){PWAInstall.checkAfterLogin();},2000);
+      }
     }catch(e){
       console.error('startApp error:',e);
       showError('앱 초기화 중 오류가 발생했습니다.<br>새로고침 후 다시 시도하세요.');
@@ -328,14 +328,11 @@ if(!Auth.tryAutoLogin()){
     });
   }
 
-  // Firebase 초기화
   try{initFirebase();}catch(e){console.error('firebase init error:',e);}
 
-  // 로컬 캐시 로드
   var hasCache=false;
   try{hasCache=SheetLoader.loadFromCache();}catch(e){}
 
-  // ★ 핵심 수정: sync 결과와 무관하게 한 번만 startApp 진입
   var syncDone=false;
   var syncTimer=null;
 
@@ -343,16 +340,14 @@ if(!Auth.tryAutoLogin()){
     if(syncDone)return;
     syncDone=true;
     if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
-
     if(hasCache){
-      startApp();                  // 캐시 있으면 즉시 시작
-      backgroundRefreshSheets();   // 백그라운드 갱신
+      startApp();
+      backgroundRefreshSheets();
     }else{
-      firstLoadSheets();           // 캐시 없으면 시트 로드 후 시작
+      firstLoadSheets();
     }
   }
 
-  // 최대 5초 대기
   syncTimer=setTimeout(function(){
     console.warn('Firebase sync timeout - proceeding');
     proceed();
@@ -365,7 +360,6 @@ if(!Auth.tryAutoLogin()){
     proceed();
   }
 
-  // Service Worker 등록
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js')
       .then(function(){console.log('SW registered');})
