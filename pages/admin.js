@@ -18,7 +18,7 @@ var PageAdmin=(function(){
     var h='<h3 style="font-size:.92em;margin-bottom:8px">👤 계정 ('+names.length+'명)</h3>';
     h+='<div style="overflow-x:auto;max-height:350px;overflow-y:auto"><table class="a-table"><thead><tr><th>이름</th><th>아이디</th><th>비밀번호</th><th>권한</th><th></th></tr></thead><tbody>';
     for(var i=0;i<names.length;i++){var n=names[i],a=acc[n];
-      h+='<tr><td>'+n+'</td><td><input id="ai'+i+'" value="'+a.id+'" data-k="'+n+'"></td><td><input id="ap'+i+'" value="'+a.pw+'" data-k="'+n+'"></td>';
+   h+='<tr><td>'+n+'</td><td><input id="ai'+i+'" value="'+a.id+'" data-k="'+n+'"></td><td><input id="ap'+i+'" value="" placeholder="변경시에만 입력" data-k="'+n+'"></td>';
       h+='<td><select id="ar'+i+'" data-k="'+n+'"><option value="user"'+(a.role==='user'?' selected':'')+'>일반</option><option value="admin"'+(a.role==='admin'?' selected':'')+'>관리자</option></select></td>';
       h+='<td><button class="a-btn danger sm" onclick="PageAdmin.delAcc(\''+n+'\')">삭제</button></td></tr>'}
     h+='</tbody></table></div>';
