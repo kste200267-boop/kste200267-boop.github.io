@@ -198,7 +198,6 @@ function extractTeachers(rows){
         CS={};
         for(var k in CS_A){CS[k]={};for(var d in CS_A[k])CS[k][d]=CS_A[k][d].slice();}
         // 로드 완료 시간 저장
-        Store.set('sheet-loaded',new Date().toISOString());
         if(cb)cb(error);
       }
     }
