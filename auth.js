@@ -1,6 +1,22 @@
-// js/auth.js — 인증 (평문 비밀번호, sessionStorage 로그인 유지)
+// js/auth.js — 인증 (평문 비밀번호, localStorage 영구 로그인)
 var Auth=(function(){
   var SESSION_KEY='gm-session-v2';
+
+  function saveSession(name,role){
+    try{localStorage.setItem(SESSION_KEY,JSON.stringify({n:name,r:role||'user'}));}catch(e){}
+  }
+  function loadSession(){
+    try{
+      var raw=localStorage.getItem(SESSION_KEY);
+      if(!raw)return null;
+      var sess=JSON.parse(raw);
+      if(!sess||!sess.n)return null;
+      return sess;
+    }catch(e){localStorage.removeItem(SESSION_KEY);return null;}
+  }
+  function clearSession(){
+    try{localStorage.removeItem(SESSION_KEY);}catch(e){}
+  }
 
   function sanitize(str){
     return String(str||'').replace(/[<>&"'`]/g,function(c){
@@ -58,21 +74,19 @@ var Auth=(function(){
     if(found.pw!==pw){errEl.textContent='비밀번호가 틀렸습니다';return;}
 
     errEl.textContent='';
-    sessionStorage.setItem(SESSION_KEY,JSON.stringify({n:fk,r:found.role||'user'}));
+    saveSession(fk,found.role||'user');
     showApp(fk,found.role==='admin');
   }
 
   function logout(){
-    sessionStorage.removeItem(SESSION_KEY);
+    clearSession();
     location.reload();
   }
 
   function tryAutoLogin(){
     try{
       migrateHashedPasswords();
-      var raw=sessionStorage.getItem(SESSION_KEY);
-      if(!raw)return false;
-      var sess=JSON.parse(raw);
+      var sess=loadSession();
       if(!sess||!sess.n)return false;
       var acc=getAccounts();
       var role=sess.r;
@@ -80,7 +94,7 @@ var Auth=(function(){
       showApp(sess.n,role==='admin');
       return true;
     }catch(e){
-      sessionStorage.removeItem(SESSION_KEY);
+      clearSession();
       return false;
     }
   }
