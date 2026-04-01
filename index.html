@@ -311,7 +311,7 @@ var PWAInstall=(function(){
     else{firstLoadSheets();}
   }
 
-  syncTimer=setTimeout(function(){console.warn('Firebase sync timeout - proceeding');proceed();},5000);
+  syncTimer=setTimeout(function(){console.warn('Firebase sync timeout - proceeding');proceed();},2000);
 
   try{Store.syncFromFirebase(function(){proceed();});}
   catch(e){console.error('syncFromFirebase error:',e);proceed();}
