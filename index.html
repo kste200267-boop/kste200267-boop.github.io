@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<!-- ★ 보안 메타 (올바른 위치) -->
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
 <title>경북기계금속고등학교 교사포털</title>
@@ -78,7 +77,6 @@
     <div class="login-title">🏫 경북기계금속고등학교</div>
     <div class="login-sub">교사 업무 포털</div>
     <div class="login-form">
-      <!-- ★ maxlength 추가 -->
       <input type="text" class="form-input" id="loginId"
         placeholder="아이디 (이름)"
         autocomplete="username"
@@ -169,7 +167,6 @@
 <script src="pages/schedule.js"></script>
 <script src="pages/tasks.js"></script>
 <script src="pages/admin.js"></script>
-<!-- ★ 비밀번호 해시 패치 (admin.js 다음) -->
 <script src="pages/admin-patch.js"></script>
 <script src="pages/profile.js"></script>
 <script src="pages/roster.js"></script>
@@ -258,90 +255,75 @@ var PWAInstall=(function(){
   };
 })();
 
-<script>
 // ═══════════════════════════════════════════════════════════
-// 앱 부트 — 안전 버전
+// 앱 부트
 // ═══════════════════════════════════════════════════════════
 (function(){
-  var initScreen = document.getElementById('initScreen');
-  var loginScreen = document.getElementById('loginScreen');
-  var shell = document.getElementById('shell');
+  var initScreen=document.getElementById('initScreen');
+  var loginScreen=document.getElementById('loginScreen');
+  var shell=document.getElementById('shell');
 
-  var started = false;
-  var bootFinished = false;
-  var syncDone = false;
-  var syncTimer = null;
-  var bootTimer = null;
+  var started=false;
+  var bootFinished=false;
+  var syncDone=false;
+  var syncTimer=null;
+  var bootTimer=null;
 
   function finishBoot(){
-    bootFinished = true;
-    if(bootTimer){
-      clearTimeout(bootTimer);
-      bootTimer = null;
-    }
+    bootFinished=true;
+    if(bootTimer){clearTimeout(bootTimer);bootTimer=null;}
   }
 
   function hideInit(){
-    if(initScreen) initScreen.style.display = 'none';
+    if(initScreen)initScreen.style.display='none';
   }
 
   function showLogin(){
     hideInit();
-    if(loginScreen) loginScreen.style.display = 'flex';
-    if(shell) shell.style.display = 'none';
+    if(loginScreen)loginScreen.style.display='flex';
+    if(shell)shell.style.display='none';
     finishBoot();
   }
 
   function showShell(){
     hideInit();
-    if(loginScreen) loginScreen.style.display = 'none';
-    if(shell) shell.style.display = '';
+    if(loginScreen)loginScreen.style.display='none';
+    if(shell)shell.style.display='flex';
     finishBoot();
   }
 
   function safeClearSession(){
     try{
-      if(window.Auth && typeof Auth.clearSession === 'function'){
-        Auth.clearSession();
-        return;
-      }
+      if(window.Auth&&typeof Auth.clearSession==='function'){Auth.clearSession();return;}
     }catch(e){}
-
-    try{
-      localStorage.removeItem('gm-session-v2');
-    }catch(e){}
+    try{localStorage.removeItem('gm-session-v2');}catch(e){}
   }
 
   function showError(msg){
     hideInit();
-    if(shell) shell.style.display = 'none';
+    if(shell)shell.style.display='none';
     if(loginScreen){
-      loginScreen.innerHTML =
-        '<div class="login-box">' +
-          '<div class="login-title">⚠️ 오류</div>' +
-          '<div class="login-sub">' + (msg || '불러오기 실패') + '</div>' +
-          '<button class="btn-login" onclick="location.reload()">다시 시도</button>' +
+      loginScreen.innerHTML=
+        '<div class="login-box">'+
+          '<div class="login-title">⚠️ 오류</div>'+
+          '<div class="login-sub">'+(msg||'불러오기 실패')+'</div>'+
+          '<button class="btn-login" onclick="location.reload()">다시 시도</button>'+
         '</div>';
-      loginScreen.style.display = 'flex';
+      loginScreen.style.display='flex';
     }
     finishBoot();
   }
 
   function startApp(){
-    if(started) return;
-    started = true;
+    if(started)return;
+    started=true;
 
-    try{
-      var savedPT = Store.get('pt');
-      if(savedPT) PT = savedPT;
-    }catch(e){
-      console.error('PT restore error:', e);
-    }
+    try{var savedPT=Store.get('pt');if(savedPT)PT=savedPT;}catch(e){}
 
     try{
       Auth.initAccounts();
     }catch(e){
-      console.error('Auth.initAccounts error:', e);
+      console.error('initAccounts error:',e);
       showError('계정 정보를 초기화하지 못했습니다.<br>새로고침 후 다시 시도하세요.');
       return;
     }
@@ -349,24 +331,21 @@ var PWAInstall=(function(){
     try{
       Engine.rebuild();
     }catch(e){
-      console.error('Engine.rebuild error:', e);
+      console.error('Engine.rebuild error:',e);
       showError('앱 데이터를 구성하는 중 오류가 발생했습니다.<br>새로고침 후 다시 시도하세요.');
       return;
     }
 
     try{
-      var ok = Auth.tryAutoLogin();
-
+      var ok=Auth.tryAutoLogin();
       if(ok){
         showShell();
-        setTimeout(function(){
-          try{ PWAInstall.checkAfterLogin(); }catch(e){ console.error(e); }
-        }, 1200);
+        setTimeout(function(){try{PWAInstall.checkAfterLogin();}catch(e){}},1200);
       }else{
         showLogin();
       }
     }catch(e){
-      console.error('Auth.tryAutoLogin error:', e);
+      console.error('tryAutoLogin error:',e);
       safeClearSession();
       showLogin();
     }
@@ -374,113 +353,75 @@ var PWAInstall=(function(){
 
   function backgroundRefreshSheets(){
     SheetLoader.loadAll(function(err){
-      if(err){
-        console.error('bg refresh error:', err);
-        return;
-      }
-      try{
-        Engine.rebuild();
-      }catch(e){
-        console.error('bg Engine.rebuild error:', e);
-      }
+      if(err){console.error('bg refresh error:',err);return;}
+      try{Engine.rebuild();}catch(e){}
     });
   }
 
   function firstLoadSheets(){
     try{
-      if(initScreen){
-        var sub = initScreen.querySelector('.sub');
-        if(sub) sub.textContent = '시간표 불러오는 중...';
-      }
+      if(initScreen){var sub=initScreen.querySelector('.sub');if(sub)sub.textContent='시간표 불러오는 중...';}
     }catch(e){}
 
     SheetLoader.loadAll(function(err){
       try{
-        var hasA = Object.keys(TD_A || {}).length > 0;
-        var hasB = Object.keys(TD_B || {}).length > 0;
-
-        if(err && !hasA && !hasB){
+        var hasA=Object.keys(TD_A||{}).length>0;
+        var hasB=Object.keys(TD_B||{}).length>0;
+        if(err&&!hasA&&!hasB){
           showError('시간표를 불러올 수 없습니다.<br>네트워크를 확인하세요.');
           return;
         }
-
         startApp();
       }catch(e){
-        console.error('firstLoadSheets callback error:', e);
+        console.error('firstLoadSheets callback error:',e);
         showError('초기 데이터를 준비하는 중 오류가 발생했습니다.');
       }
     });
   }
 
   function proceed(){
-    if(syncDone) return;
-    syncDone = true;
-
-    if(syncTimer){
-      clearTimeout(syncTimer);
-      syncTimer = null;
-    }
-
+    if(syncDone)return;
+    syncDone=true;
+    if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
     try{
-      if(hasCache){
-        startApp();
-        backgroundRefreshSheets();
-      }else{
-        firstLoadSheets();
-      }
+      if(hasCache){startApp();backgroundRefreshSheets();}
+      else{firstLoadSheets();}
     }catch(e){
-      console.error('proceed error:', e);
+      console.error('proceed error:',e);
       showError('앱 실행 중 오류가 발생했습니다.');
     }
   }
 
-  // Firebase 초기화
-  try{
-    initFirebase();
-  }catch(e){
-    console.error('firebase init error:', e);
-  }
+  try{initFirebase();}catch(e){console.error('firebase init error:',e);}
 
-  // 캐시 시간표 확인
-  var hasCache = false;
-  try{
-    hasCache = SheetLoader.loadFromCache();
-  }catch(e){
-    console.error('loadFromCache error:', e);
-  }
+  var hasCache=false;
+  try{hasCache=SheetLoader.loadFromCache();}catch(e){}
 
-  // Firebase 동기화 타임아웃
-  syncTimer = setTimeout(function(){
+  syncTimer=setTimeout(function(){
     console.warn('Firebase sync timeout - proceeding');
     proceed();
-  }, 2000);
+  },2000);
 
   try{
-    Store.syncFromFirebase(function(){
-      proceed();
-    });
+    Store.syncFromFirebase(function(){proceed();});
   }catch(e){
-    console.error('syncFromFirebase error:', e);
+    console.error('syncFromFirebase error:',e);
     proceed();
   }
 
-  // 전체 부팅 실패 대비용 최종 탈출 장치
-  bootTimer = setTimeout(function(){
-    if(bootFinished) return;
+  bootTimer=setTimeout(function(){
+    if(bootFinished)return;
     console.warn('boot fallback - forcing login screen');
     safeClearSession();
     showLogin();
-  }, 5000);
+  },5000);
 
-  // 서비스워커 등록
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js')
-      .then(function(){
-        console.log('SW registered');
-      })
-      .catch(function(e){
-        console.error('SW failed:', e);
-      });
+      .then(function(){console.log('SW registered');})
+      .catch(function(e){console.error('SW failed:',e);});
   }
 })();
 </script>
+</body>
+</html>
