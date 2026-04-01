@@ -268,65 +268,29 @@ var PWAInstall=(function(){
   var started=false;
 
   function hideInit(){if(initScreen)initScreen.style.display='none';}
-
-  function showLogin(){
-    hideInit();
-    loginScreen.style.display='flex';
-    shell.style.display='none';
-  }
-
-  function showLoading(msg){
-    if(initScreen){
-      var sub=initScreen.querySelector('.sub');
-      if(sub)sub.textContent=msg||'불러오는 중...';
-      initScreen.style.display='flex';
-    }
-    loginScreen.style.display='none';
-    shell.style.display='none';
-  }
-
-  function showError(msg){
-    hideInit();
-    loginScreen.innerHTML='<div class="login-box"><div class="login-title">⚠️ 오류</div><div class="login-sub">'+(msg||'불러오기 실패')+'</div><button class="btn-login" onclick="location.reload()">다시 시도</button></div>';
-    loginScreen.style.display='flex';
-  }
+  function showLogin(){hideInit();loginScreen.style.display='flex';shell.style.display='none';}
+  function showError(msg){hideInit();loginScreen.innerHTML='<div class="login-box"><div class="login-title">⚠️ 오류</div><div class="login-sub">'+(msg||'불러오기 실패')+'</div><button class="btn-login" onclick="location.reload()">다시 시도</button></div>';loginScreen.style.display='flex';}
 
   function startApp(){
     if(started)return;
     started=true;
     try{
       var savedPT=Store.get('pt');if(savedPT)PT=savedPT;
-
-      // ★ 핵심 수정: initAccounts는 sync 완료 후 호출되므로 여기선 생략
-      // initAccounts()는 syncFromFirebase 콜백 안에서 호출됨
+      Auth.initAccounts();
       Engine.rebuild();
-
-      if(!Auth.tryAutoLogin()){
-        showLogin();
-      }else{
-        hideInit();
-        setTimeout(function(){PWAInstall.checkAfterLogin();},2000);
-      }
-    }catch(e){
-      console.error('startApp error:',e);
-      showError('앱 초기화 중 오류가 발생했습니다.<br>새로고침 후 다시 시도하세요.');
-    }
+      if(!Auth.tryAutoLogin()){showLogin();}
+      else{hideInit();setTimeout(function(){PWAInstall.checkAfterLogin();},2000);}
+    }catch(e){console.error('startApp error:',e);showError('앱 초기화 중 오류가 발생했습니다.<br>새로고침 후 다시 시도하세요.');}
   }
 
   function backgroundRefreshSheets(){
-    SheetLoader.loadAll(function(err){
-      if(err){console.error('bg refresh:',err);return;}
-      try{Engine.rebuild();}catch(e){}
-    });
+    SheetLoader.loadAll(function(err){if(err){console.error('bg refresh:',err);return;}try{Engine.rebuild();}catch(e){}});
   }
 
   function firstLoadSheets(){
-    showLoading('시간표 불러오는 중...');
+    if(initScreen){var sub=initScreen.querySelector('.sub');if(sub)sub.textContent='시간표 불러오는 중...';}
     SheetLoader.loadAll(function(err){
-      if(err&&!Object.keys(TD_A||{}).length&&!Object.keys(TD_B||{}).length){
-        showError('시간표를 불러올 수 없습니다.<br>네트워크를 확인하세요.');
-        return;
-      }
+      if(err&&!Object.keys(TD_A||{}).length&&!Object.keys(TD_B||{}).length){showError('시간표를 불러올 수 없습니다.<br>네트워크를 확인하세요.');return;}
       startApp();
     });
   }
@@ -343,33 +307,16 @@ var PWAInstall=(function(){
     if(syncDone)return;
     syncDone=true;
     if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
-
-    // ★ 핵심 수정: sync 완료 후 initAccounts 실행 → 그 다음 앱 시작
-    try{Auth.initAccounts();}catch(e){console.error('initAccounts error:',e);}
-
-    if(hasCache){
-      startApp();
-      backgroundRefreshSheets();
-    }else{
-      firstLoadSheets();
-    }
+    if(hasCache){startApp();backgroundRefreshSheets();}
+    else{firstLoadSheets();}
   }
 
-  syncTimer=setTimeout(function(){
-    console.warn('Firebase sync timeout - proceeding');
-    proceed();
-  },5000);
+  syncTimer=setTimeout(function(){console.warn('Firebase sync timeout - proceeding');proceed();},5000);
 
-  try{
-    Store.syncFromFirebase(function(){proceed();});
-  }catch(e){
-    console.error('syncFromFirebase error:',e);
-    proceed();
-  }
+  try{Store.syncFromFirebase(function(){proceed();});}
+  catch(e){console.error('syncFromFirebase error:',e);proceed();}
 
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./sw.js')
-      .then(function(){console.log('SW registered');})
-      .catch(function(e){console.error('SW failed:',e);});
+    navigator.serviceWorker.register('./sw.js').then(function(){console.log('SW registered');}).catch(function(e){console.error('SW failed:',e);});
   }
 })();
