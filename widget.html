@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>경북기계금속고 위젯</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f1117;
+  --card:#161b27;
+  --card2:#1e2535;
+  --border:#252d3d;
+  --blue:#4f8ef7;
+  --blue2:#2563eb;
+  --green:#22c55e;
+  --yellow:#f59e0b;
+  --red:#ef4444;
+  --purple:#a78bfa;
+  --tx:#e8edf5;
+  --tx2:#8892a4;
+  --tx3:#4a5568;
+  --font:'Noto Sans KR',sans-serif;
+  --mono:'DM Mono',monospace;
+}
+html,body{
+  height:100%;
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--tx);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* 레이아웃 */
+.widget-wrap{
+  display:grid;
+  grid-template-columns:280px 1fr 260px;
+  grid-template-rows:auto 1fr;
+  gap:12px;
+  padding:16px;
+  min-height:100vh;
+  max-width:1100px;
+  margin:0 auto;
+}
+
+/* 헤더 */
+.header{
+  grid-column:1/-1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 4px;
+}
+.header-left{display:flex;align-items:center;gap:12px}
+.school-name{font-size:.78em;color:var(--tx2);font-weight:500;letter-spacing:.05em}
+.clock{font-family:var(--mono);font-size:2em;font-weight:500;color:var(--tx);letter-spacing:-.02em}
+.date-info{font-size:.8em;color:var(--tx2)}
+.header-right{display:flex;align-items:center;gap:8px}
+.period-badge{
+  padding:4px 12px;border-radius:20px;
+  font-size:.78em;font-weight:700;
+  letter-spacing:.03em;
+}
+.period-badge.class{background:rgba(79,142,247,.15);color:var(--blue);border:1px solid rgba(79,142,247,.3)}
+.period-badge.break{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.period-badge.done{background:rgba(74,85,104,.15);color:var(--tx3);border:1px solid var(--border)}
+
+/* 카드 공통 */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px;
+  position:relative;
+  overflow:hidden;
+}
+.card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);
+}
+.card-title{
+  font-size:.7em;
+  font-weight:700;
+  letter-spacing:.1em;
+  color:var(--tx3);
+  text-transform:uppercase;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.card-title .dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--blue);
+  box-shadow:0 0 6px var(--blue);
+}
+
+/* 시간표 카드 */
+.timetable-card{grid-row:2}
+.period-list{display:flex;flex-direction:column;gap:4px}
+.period-item{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;
+  border-radius:8px;
+  transition:background .15s;
+  position:relative;
+}
+.period-item.now{
+  background:rgba(79,142,247,.12);
+  border:1px solid rgba(79,142,247,.25);
+}
+.period-item.done{opacity:.4}
+.period-item.upcoming{}
+.period-num{
+  font-family:var(--mono);
+  font-size:.7em;
+  color:var(--tx3);
+  min-width:14px;
+  text-align:center;
+}
+.period-item.now .period-num{color:var(--blue)}
+.period-time{
+  font-family:var(--mono);
+  font-size:.68em;
+  color:var(--tx3);
+  min-width:44px;
+}
+.period-cls{
+  font-size:.82em;
+  font-weight:600;
+  color:var(--tx);
+  min-width:36px;
+}
+.period-item.now .period-cls{color:var(--blue)}
+.period-subj{
+  font-size:.75em;
+  color:var(--tx2);
+  flex:1;
+}
+.period-item.empty .period-cls,.period-item.empty .period-subj{color:var(--tx3)}
+.now-indicator{
+  position:absolute;
+  right:8px;top:50%;transform:translateY(-50%);
+  width:6px;height:6px;border-radius:50%;
+  background:var(--blue);
+  box-shadow:0 0 8px var(--blue);
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{
+  0%,100%{opacity:1;transform:translateY(-50%) scale(1)}
+  50%{opacity:.5;transform:translateY(-50%) scale(1.4)}
+}
+
+/* 급식 카드 */
+.meal-card{grid-row:2}
+.meal-tabs{display:flex;gap:4px;margin-bottom:12px}
+.meal-tab{
+  padding:3px 10px;border-radius:6px;
+  font-size:.72em;font-weight:600;
+  cursor:pointer;
+  border:1px solid var(--border);
+  color:var(--tx2);
+  background:transparent;
+  transition:all .15s;
+}
+.meal-tab.on{
+  background:rgba(79,142,247,.15);
+  color:var(--blue);
+  border-color:rgba(79,142,247,.3);
+}
+.meal-content{display:none}
+.meal-content.on{display:block}
+.meal-item{
+  padding:4px 0;
+  font-size:.82em;
+  color:var(--tx);
+  border-bottom:1px solid rgba(255,255,255,.04);
+  display:flex;align-items:center;gap:6px;
+}
+.meal-item:last-child{border-bottom:none}
+.meal-cal{
+  margin-top:8px;
+  font-size:.72em;
+  color:var(--tx3);
+  display:flex;align-items:center;gap:4px;
+}
+
+/* 주간업무 카드 */
+.weekly-card{grid-row:2}
+.event-list{display:flex;flex-direction:column;gap:6px}
+.event-item{
+  padding:8px 10px;
+  border-radius:8px;
+  background:var(--card2);
+  border-left:3px solid;
+  position:relative;
+}
+.event-dept{font-size:.68em;font-weight:700;letter-spacing:.05em;opacity:.8}
+.event-title{font-size:.82em;font-weight:500;margin-top:2px;word-break:keep-all;line-height:1.35}
+.event-time{font-size:.7em;color:var(--tx3);margin-top:2px;font-family:var(--mono)}
+.event-loc{font-size:.7em;color:var(--tx3)}
+.no-events{
+  text-align:center;padding:30px 0;
+  color:var(--tx3);font-size:.82em;
+}
+
+/* 날짜 네비 */
+.date-nav{display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.date-nav button{
+  background:none;border:1px solid var(--border);
+  color:var(--tx2);border-radius:6px;
+  padding:2px 8px;font-size:.72em;cursor:pointer;
+}
+.date-nav button:hover{background:var(--card2)}
+.date-nav .label{font-size:.78em;color:var(--tx);font-weight:500;flex:1;text-align:center}
+
+/* 로딩 */
+.loading{
+  display:flex;align-items:center;gap:6px;
+  color:var(--tx3);font-size:.8em;padding:8px 0;
+}
+.loading-dot{
+  width:4px;height:4px;border-radius:50%;
+  background:var(--tx3);
+  animation:blink 1.2s infinite;
+}
+.loading-dot:nth-child(2){animation-delay:.2s}
+.loading-dot:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+
+/* 스크롤바 */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* 반응형 */
+@media(max-width:800px){
+  .widget-wrap{grid-template-columns:1fr;grid-template-rows:auto}
+  .timetable-card,.meal-card,.weekly-card{grid-row:auto}
+}
+</style>
+</head>
+<body>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+<div class="widget-wrap">
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="header-left">
+      <div>
+        <div class="school-name">🏫 경북기계금속고등학교</div>
+        <div class="clock" id="clock">--:--</div>
+        <div class="date-info" id="dateInfo">--</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="period-badge break" id="periodStatus">로딩 중...</div>
+    </div>
+  </div>
+
+  <!-- 오늘 시간표 -->
+  <div class="card timetable-card">
+    <div class="card-title"><span class="dot"></span>오늘 시간표</div>
+    <div class="period-list" id="periodList">
+      <div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>
+    </div>
+  </div>
+
+  <!-- 급식 -->
+  <div class="card meal-card">
+    <div class="card-title"><span class="dot" style="background:var(--green);box-shadow:0 0 6px var(--green)"></span>오늘 급식</div>
+    <div class="meal-tabs" id="mealTabs"></div>
+    <div id="mealContents">
+      <div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>
+    </div>
+  </div>
+
+  <!-- 주간업무 -->
+  <div class="card weekly-card">
+    <div class="card-title"><span class="dot" style="background:var(--purple);box-shadow:0 0 6px var(--purple)"></span>주간업무</div>
+    <div class="date-nav">
+      <button onclick="W.prev()">◀</button>
+      <span class="label" id="weeklyDateLabel">--</span>
+      <button onclick="W.next()">▶</button>
+    </div>
+    <div class="event-list" id="eventList">
+      <div class="loading"><div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════
+// CONFIG
+// ═══════════════
+var FIREBASE_CONFIG={
+  apiKey:"AIzaSyAIL9zYAkt_VKPck7FaMuHTFc6ALMeIp7k",
+  authDomain:"gbgigo-portal.firebaseapp.com",
+  projectId:"gbgigo-portal",
+  storageBucket:"gbgigo-portal.firebasestorage.app",
+  messagingSenderId:"276912850692",
+  appId:"1:276912850692:web:7567b8af1cee85e2c9f251"
+};
+var NEIS_KEY='090d1bde6d4d4e44a10ab8b7c1e43b39';
+var NEIS_BASE='https://open.neis.go.kr/hub';
+var NEIS_OFFICE='R10';
+var SCHOOL_NAME='경북기계금속고등학교';
+
+var PT=[
+  {s:'08:50',e:'09:40'},{s:'09:50',e:'10:40'},
+  {s:'10:50',e:'11:40'},{s:'11:50',e:'12:40'},
+  {s:'13:30',e:'14:20'},{s:'14:30',e:'15:20'},
+  {s:'15:30',e:'16:20'}
+];
+var DAYS=['월','화','수','목','금'];
+var DP={월:7,화:7,수:6,목:6,금:6};
+
+// 로그인 사용자 localStorage에서 읽기
+var SESSION_KEY='gm-session-v2';
+var currentUser=null;
+try{
+  var sess=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');
+  if(sess&&sess.n) currentUser=sess.n;
+}catch(e){}
+
+// ═══════════════
+// UTILS
+// ═══════════════
+function pad(n){return String(n).padStart(2,'0')}
+function ymd(d){return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())}
+function todayDay(){return{0:null,1:'월',2:'화',3:'수',4:'목',5:'금',6:null}[new Date().getDay()]}
+function nowPeriod(){
+  var d=new Date(),t=d.getHours()*60+d.getMinutes();
+  for(var i=0;i<PT.length;i++){
+    var s=PT[i].s.split(':'),e=PT[i].e.split(':');
+    if(t>=+s[0]*60+ +s[1]&&t<=+e[0]*60+ +e[1]) return i;
+  }
+  return -1;
+}
+function timeToMin(str){var p=str.split(':');return +p[0]*60+ +p[1]}
+
+// ═══════════════
+// CLOCK
+// ═══════════════
+function updateClock(){
+  var d=new Date();
+  document.getElementById('clock').textContent=pad(d.getHours())+':'+pad(d.getMinutes());
+  var days=['일','월','화','수','목','금','토'];
+  document.getElementById('dateInfo').textContent=
+    (d.getMonth()+1)+'월 '+d.getDate()+'일 '+days[d.getDay()]+'요일';
+  updatePeriodStatus();
+}
+function updatePeriodStatus(){
+  var d=new Date(),t=d.getHours()*60+d.getMinutes();
+  var np=nowPeriod();
+  var el=document.getElementById('periodStatus');
+  var day=todayDay();
+  if(!day){el.textContent='주말';el.className='period-badge done';return}
+  if(np>=0){
+    el.textContent=(np+1)+'교시 수업 중';
+    el.className='period-badge class';
+  }else if(t<timeToMin('08:50')){
+    el.textContent='수업 전';el.className='period-badge break';
+  }else if(t>timeToMin('16:20')){
+    el.textContent='수업 종료';el.className='period-badge done';
+  }else{
+    // 쉬는 시간 — 다음 교시 몇 분 후?
+    for(var i=0;i<PT.length;i++){
+      var s=timeToMin(PT[i].s);
+      if(t<s){
+        var diff=s-t;
+        el.textContent=diff+'분 후 '+(i+1)+'교시';
+        el.className='period-badge break';
+        return;
+      }
+    }
+    el.textContent='쉬는 시간';el.className='period-badge break';
+  }
+}
+setInterval(updateClock,1000);
+updateClock();
+
+// ═══════════════
+// 시간표 로드 (localStorage 캐시에서)
+// ═══════════════
+function loadTimetable(){
+  var el=document.getElementById('periodList');
+  var day=todayDay();
+  if(!day){
+    el.innerHTML='<div style="color:var(--tx3);font-size:.82em;padding:8px 0;text-align:center">오늘은 주말입니다 🎉</div>';
+    return;
+  }
+
+  // localStorage 캐시에서 시간표 읽기
+  var tdRaw=localStorage.getItem('cache-TD_A');
+  if(!tdRaw){
+    el.innerHTML='<div style="color:var(--tx3);font-size:.82em;padding:8px">포털에 먼저 로그인해주세요</div>';
+    return;
+  }
+
+  var TD={},CS={};
+  try{TD=JSON.parse(tdRaw);}catch(e){}
+  try{CS=JSON.parse(localStorage.getItem('cache-CS_A')||'{}');}catch(e){}
+
+  // 커스텀 시간표 반영
+  if(currentUser){
+    var custom=localStorage.getItem('gm-td-custom-'+currentUser);
+    if(custom){try{TD[currentUser]=JSON.parse(custom);}catch(e){}}
+  }
+
+  var user=currentUser;
+  if(!user||!TD[user]){
+    el.innerHTML='<div style="color:var(--tx3);font-size:.82em;padding:8px">사용자 정보 없음<br><small>포털에서 로그인 후 다시 열어주세요</small></div>';
+    return;
+  }
+
+  var t=TD[user];
+  var dayIdx={월:0,화:1,수:2,목:3,금:4}[day];
+  var maxP=DP[day];
+  var np=nowPeriod();
+  var now=new Date(),nowMin=now.getHours()*60+now.getMinutes();
+
+  // 슬롯 인덱스 계산
+  function si(d,p){
+    var i=0;
+    for(var di=0;di<5;di++){
+      if(DAYS[di]===d)return i+p;
+      i+=DP[DAYS[di]];
+    }
+    return -1;
+  }
+
+  var html='';
+  for(var p=0;p<maxP;p++){
+    var idx=si(day,p);
+    var cl=t.s[idx]||null;
+    var sj='';
+    if(cl&&CS[cl]&&CS[cl][day])sj=CS[cl][day][p]||'';
+
+    var isNow=(p===np);
+    var isDone=nowMin>timeToMin(PT[p].e);
+    var cls=isNow?'now':isDone?'done':(cl?'upcoming':'empty');
+
+    html+='<div class="period-item '+cls+'">';
+    html+='<span class="period-num">'+(p+1)+'</span>';
+    html+='<span class="period-time">'+PT[p].s+'</span>';
+    html+='<span class="period-cls">'+(cl||'—')+'</span>';
+    html+='<span class="period-subj">'+(sj||'')+'</span>';
+    if(isNow)html+='<span class="now-indicator"></span>';
+    html+='</div>';
+  }
+  el.innerHTML=html;
+}
+
+// ═══════════════
+// 급식 로드
+// ═══════════════
+var mealData={};
+var activeMealType='중식';
+
+function loadMeal(){
+  var schoolCode=localStorage.getItem('gm-neis-school-code');
+  if(!schoolCode){
+    findSchoolCode(function(code){
+      if(code){localStorage.setItem('gm-neis-school-code',code);fetchMeal(code);}
+      else{document.getElementById('mealContents').innerHTML='<div style="color:var(--tx3);font-size:.8em">급식 정보 없음</div>';}
+    });
+    return;
+  }
+  fetchMeal(schoolCode);
+}
+
+function findSchoolCode(cb){
+  var url=NEIS_BASE+'/schoolInfo?KEY='+NEIS_KEY+'&Type=json&pIndex=1&pSize=5&ATPT_OFCDC_SC_CODE='+NEIS_OFFICE+'&SCHUL_NM='+encodeURIComponent(SCHOOL_NAME);
+  fetch(url).then(function(r){return r.json()}).then(function(data){
+    try{cb(data.schoolInfo[1].row[0].SD_SCHUL_CODE)}catch(e){cb(null)}
+  }).catch(function(){cb(null)});
+}
+
+function fetchMeal(code){
+  var today=ymd(new Date());
+  var url=NEIS_BASE+'/mealServiceDietInfo?KEY='+NEIS_KEY+'&Type=json&pIndex=1&pSize=10'+
+    '&ATPT_OFCDC_SC_CODE='+NEIS_OFFICE+'&SD_SCHUL_CODE='+code+
+    '&MLSV_FROM_YMD='+today+'&MLSV_TO_YMD='+today;
+
+  fetch(url).then(function(r){return r.json()}).then(function(data){
+    try{
+      var rows=data.mealServiceDietInfo[1].row;
+      mealData={};
+      rows.forEach(function(r){
+        var items=r.DDISH_NM.replace(/<br\/>/g,'\n').split('\n')
+          .map(function(s){return s.replace(/\d+\.\s*/g,'').replace(/[()]/g,'').trim()})
+          .filter(Boolean);
+        mealData[r.MMEAL_SC_NM]={items:items,cal:r.CAL_INFO||''};
+      });
+      renderMeal();
+    }catch(e){
+      document.getElementById('mealContents').innerHTML='<div style="color:var(--tx3);font-size:.8em;padding:8px 0">오늘 급식 정보 없음</div>';
+      document.getElementById('mealTabs').innerHTML='';
+    }
+  }).catch(function(){
+    document.getElementById('mealContents').innerHTML='<div style="color:var(--tx3);font-size:.8em">급식 불러오기 실패</div>';
+  });
+}
+
+function autoSelectMeal(){
+  var d=new Date(),h=d.getHours(),m=d.getMinutes(),t=h*60+m;
+  if(t<7*60+30) return '조식';
+  if(t<13*60+30) return '중식';
+  return '석식';
+}
+
+function renderMeal(){
+  var types=['조식','중식','석식'];
+  var icons={조식:'🌅',중식:'☀️',석식:'🌙'};
+  var tabsHtml='';
+  var contentsHtml='';
+
+  // 현재 시간 기준 자동 선택
+  activeMealType=autoSelectMeal();
+  // 데이터 있는 타입으로 폴백
+  if(!mealData[activeMealType]){
+    for(var i=0;i<types.length;i++){
+      if(mealData[types[i]]){activeMealType=types[i];break;}
+    }
+  }
+
+  types.forEach(function(type){
+    if(!mealData[type])return;
+    var on=type===activeMealType;
+    tabsHtml+='<button class="meal-tab'+(on?' on':'')+'" onclick="W.selectMeal(\''+type+'\')">';
+    tabsHtml+=icons[type]+' '+type+'</button>';
+    contentsHtml+='<div class="meal-content'+(on?' on':'')+'" id="meal-'+type+'">';
+    mealData[type].items.slice(0,8).forEach(function(item){
+      contentsHtml+='<div class="meal-item">'+item+'</div>';
+    });
+    if(mealData[type].cal){
+      contentsHtml+='<div class="meal-cal">🔥 '+mealData[type].cal+'</div>';
+    }
+    contentsHtml+='</div>';
+  });
+
+  document.getElementById('mealTabs').innerHTML=tabsHtml;
+  document.getElementById('mealContents').innerHTML=contentsHtml||'<div style="color:var(--tx3);font-size:.8em">급식 정보 없음</div>';
+}
+
+// ═══════════════
+// 주간업무 로드 (Firebase)
+// ═══════════════
+var W=(function(){
+  var dayOff=0;
+  var allEvents=[];
+  var _db=null;
+
+  function init(){
+    try{
+      if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+      _db=firebase.firestore();
+      loadEvents();
+    }catch(e){
+      document.getElementById('eventList').innerHTML='<div style="color:var(--tx3);font-size:.8em">Firebase 초기화 실패</div>';
+    }
+  }
+
+  function loadEvents(){
+    // localStorage 캐시 먼저
+    try{
+      var raw=localStorage.getItem('weekly-public-events-v2');
+      if(raw){
+        var parsed=JSON.parse(raw);
+        if(parsed&&parsed.events){allEvents=parsed.events;renderEvents();}
+      }
+    }catch(e){}
+
+    if(!_db)return;
+    _db.collection('portal').doc('weekly-events').get().then(function(doc){
+      if(doc.exists&&doc.data()&&doc.data().events){
+        allEvents=doc.data().events;
+        try{localStorage.setItem('weekly-public-events-v2',JSON.stringify({savedAt:Date.now(),events:allEvents}));}catch(e){}
+        renderEvents();
+      }else if(!allEvents.length){
+        document.getElementById('eventList').innerHTML='<div class="no-events">등록된 일정 없음</div>';
+      }
+    }).catch(function(){
+      if(!allEvents.length)document.getElementById('eventList').innerHTML='<div class="no-events">불러오기 실패</div>';
+    });
+  }
+
+  function getTargetDate(){
+    var d=new Date();d.setDate(d.getDate()+dayOff);return d;
+  }
+
+  function renderEvents(){
+    var target=getTargetDate();
+    var ymdStr=ymd(target);
+    var days=['일','월','화','수','목','금','토'];
+    document.getElementById('weeklyDateLabel').textContent=
+      (target.getMonth()+1)+'월 '+target.getDate()+'일 ('+days[target.getDay()]+')';
+
+    var filtered=allEvents.filter(function(ev){
+      var s=ev.start?ev.start.slice(0,10).replace(/-/g,''):'';
+      var e=ev.end?ev.end.slice(0,10).replace(/-/g,''):'';
+      return s<=ymdStr&&e>=ymdStr;
+    });
+
+    filtered.sort(function(a,b){
+      if(a.isAllDay&&!b.isAllDay)return -1;
+      if(!a.isAllDay&&b.isAllDay)return 1;
+      return new Date(a.start)-new Date(b.start);
+    });
+
+    if(!filtered.length){
+      document.getElementById('eventList').innerHTML='<div class="no-events">이 날 일정 없음</div>';
+      return;
+    }
+
+    var html='';
+    filtered.forEach(function(ev){
+      var title=ev.title?(ev.title.replace(/\[[^\]]+\]\s*/,'')):'';
+      var dept=ev.department||'';
+      var color=ev.departmentColor||'#4f8ef7';
+      var time='종일';
+      if(!ev.isAllDay&&ev.start){
+        var st=new Date(ev.start),et=new Date(ev.end);
+        time=pad(st.getHours())+':'+pad(st.getMinutes())+'~'+pad(et.getHours())+':'+pad(et.getMinutes());
+      }
+      html+='<div class="event-item" style="border-left-color:'+color+'">';
+      html+='<div class="event-dept" style="color:'+color+'">'+dept+'</div>';
+      html+='<div class="event-title">'+title+'</div>';
+      html+='<div class="event-time">'+time;
+      if(ev.location)html+=' · 📍'+ev.location;
+      html+='</div></div>';
+    });
+    document.getElementById('eventList').innerHTML=html;
+  }
+
+  return{
+    init:init,
+    prev:function(){dayOff--;renderEvents();},
+    next:function(){dayOff++;renderEvents();},
+    selectMeal:function(type){
+      activeMealType=type;
+      document.querySelectorAll('.meal-tab').forEach(function(el){
+        el.className='meal-tab'+(el.textContent.indexOf(type)>=0?' on':'');
+      });
+      document.querySelectorAll('.meal-content').forEach(function(el){
+        el.className='meal-content'+(el.id==='meal-'+type?' on':'');
+      });
+    }
+  };
+})();
+
+// ═══════════════
+// 시작
+// ═══════════════
+loadTimetable();
+loadMeal();
+W.init();
+
+// 1분마다 시간표 상태 업데이트
+setInterval(loadTimetable,60000);
+// 포털 localStorage 변경 감지
+window.addEventListener('storage',function(e){
+  if(e.key&&(e.key.indexOf('cache-TD')>=0||e.key===SESSION_KEY)){
+    loadTimetable();
+  }
+});
+</script>
+</body>
+</html>
