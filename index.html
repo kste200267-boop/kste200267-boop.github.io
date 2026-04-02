@@ -298,6 +298,9 @@ var PWAInstall=(function(){
     try{
       if(window.Auth&&typeof Auth.clearSession==='function'){Auth.clearSession();return;}
     }catch(e){}
+    try{sessionStorage.removeItem('gm-session-v3');}catch(e){}
+    try{sessionStorage.removeItem('gm-session-v2');}catch(e){}
+    try{localStorage.removeItem('gm-session-v3');}catch(e){}
     try{localStorage.removeItem('gm-session-v2');}catch(e){}
   }
 
@@ -325,9 +328,11 @@ var PWAInstall=(function(){
     try{
       Auth.initAccounts();
     }catch(e){
-      console.error('initAccounts error:',e);
+
+
       showError('계정 정보를 초기화하지 못했습니다.<br>새로고침 후 다시 시도하세요.');
       return;
+
     }
 
     try{

@@ -62,6 +62,32 @@ var Store = (function(){
     }
   }
 
+  function clearLocalCache(opts){
+    opts = safeObject(opts);
+    var keep = {};
+    safeArray(opts.keep).forEach(function(key){
+      if(key) keep[String(key)] = true;
+    });
+
+    try{
+      var keys = [];
+      for(var i = 0; i < localStorage.length; i += 1){
+        var key = localStorage.key(i);
+        if(!key || key.indexOf(P) !== 0) continue;
+        if(keep[key]) continue;
+        keys.push(key);
+      }
+
+      keys.forEach(function(key){
+        try{ localStorage.removeItem(key); }catch(removeError){
+          console.error('local clear error [' + key + ']:', removeError);
+        }
+      });
+    }catch(e){
+      console.error('clearLocalCache error:', e);
+    }
+  }
+
   function fbGet(key, cb){
     if(!_fbReady || !_db){
       if(typeof cb === 'function') cb(null);
@@ -192,6 +218,7 @@ var Store = (function(){
     get: get,
     set: set,
     remove: remove,
+    clearLocalCache: clearLocalCache,
     weekKey: weekKey,
     getMonday: getMonday,
     syncFromFirebase: syncFromFirebase,

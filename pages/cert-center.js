@@ -75,6 +75,7 @@ var PageCertCenter = (function(){
       programs: [],
       programMeta: {},
       updatedAt: '',
+      syncedUpdatedAt: '',
       updatedBy: ''
     };
     DEFAULT_PROGRAMS.forEach(function(item){
@@ -96,9 +97,48 @@ var PageCertCenter = (function(){
     }
   }
 
+  function getCacheStore(){
+    try{
+      return window.sessionStorage;
+    }catch(e){
+      return null;
+    }
+  }
+
+  function readCacheRaw(){
+    var sessionStore = getCacheStore();
+    try{
+      if(sessionStore){
+        var sessionValue = sessionStore.getItem(CACHE_KEY);
+        if(sessionValue) return sessionValue;
+      }
+    }catch(ignore){}
+    try{
+      var legacyValue = localStorage.getItem(CACHE_KEY);
+      if(legacyValue && sessionStore){
+        sessionStore.setItem(CACHE_KEY, legacyValue);
+        localStorage.removeItem(CACHE_KEY);
+      }
+      return legacyValue;
+    }catch(ignore2){
+      return null;
+    }
+  }
+
+  function writeCacheRaw(raw){
+    var sessionStore = getCacheStore();
+    try{
+      if(sessionStore) sessionStore.setItem(CACHE_KEY, raw);
+      else localStorage.setItem(CACHE_KEY, raw);
+    }catch(e){
+      console.error('cert center cache write error:', e);
+    }
+    try{ localStorage.removeItem(CACHE_KEY); }catch(ignore){}
+  }
+
   function hydrateFromCache(){
     try{
-      var raw = localStorage.getItem(CACHE_KEY);
+      var raw = readCacheRaw();
       if(!raw) return;
       var cached = JSON.parse(raw);
       if(!cached) return;
@@ -114,7 +154,7 @@ var PageCertCenter = (function(){
 
   function cacheState(){
     try{
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
+      writeCacheRaw(JSON.stringify({
         config: state.config,
         classes: state.classes,
         logs: state.logs.slice(0, 40),
@@ -249,6 +289,7 @@ var PageCertCenter = (function(){
       programs: Object.keys(programMap),
       programMeta: {},
       updatedAt: cfg.updatedAt || '',
+      syncedUpdatedAt: cfg.syncedUpdatedAt || cfg.updatedAt || '',
       updatedBy: cfg.updatedBy || ''
     };
 
@@ -352,6 +393,7 @@ var PageCertCenter = (function(){
         dept: meta.dept,
         classNo: meta.classNo,
         updated: doc.updated || '',
+        syncedUpdated: doc.syncedUpdated || doc.updated || '',
         updatedBy: doc.updatedBy || '',
         students: students
       };
@@ -605,6 +647,7 @@ var PageCertCenter = (function(){
 
     html += '<div class="card">' +
       '<div class="card-h">조건 검색과 도움말<span class="right">필터를 바꾸면 표와 그래프가 함께 갱신됩니다.</span></div>' +
+      '<div class="cert-guide"><b>대시보드 보는 법</b><br>위 숫자는 현재 필터 범위 기준입니다. 자격증과 방과후 필터를 함께 좁히면 어느 학년과 어느 반에서 성과와 누락이 생기는지 바로 비교할 수 있습니다.</div>' +
       '<div class="filter-row">' +
         renderFilterSelect('grade', state.filters.grade, ['전체', '1', '2', '3'], '학년') +
         renderFilterSelect('dept', state.filters.dept, deptOptions, '학과') +
@@ -754,6 +797,65 @@ var PageCertCenter = (function(){
     };
   }
 
+  function domSafeId(value){
+    return String(value || '').replace(/[^A-Za-z0-9_-]/g, function(ch){
+      return '_' + ch.charCodeAt(0).toString(16);
+    });
+  }
+
+  function getActiveCertNames(student){
+    return state.config.certs.filter(function(name){
+      return student.certs[name] && student.certs[name] !== '선택';
+    });
+  }
+
+  function renderStudentCertManager(student){
+    var active = getActiveCertNames(student);
+    var remaining = state.config.certs.filter(function(name){
+      return active.indexOf(name) < 0;
+    });
+    var selectId = 'certAdd_' + domSafeId(student.id);
+    var statusId = 'certAddStatus_' + domSafeId(student.id);
+    var html = '<div class="cert-entry-box">';
+
+    if(!active.length){
+      html += '<div class="cert-entry-empty">등록된 자격증 없음</div>';
+    }else{
+      active.forEach(function(name){
+        html += '<div class="cert-entry-row">' +
+          '<div class="cert-entry-name">' + esc(name) + '</div>' +
+          '<select class="ti-sel" onchange="PageCertCenter.updateStudentCertByName(\'' + quote(student.id) + '\',\'' + quote(name) + '\',this.value)">';
+        CERT_OPTIONS.forEach(function(option){
+          html += '<option value="' + esc(option) + '"' + (student.certs[name] === option ? ' selected' : '') + '>' + esc(option) + '</option>';
+        });
+        html += '</select>' +
+          '<button class="a-btn sm outline" onclick="PageCertCenter.removeStudentCert(\'' + quote(student.id) + '\',\'' + quote(name) + '\')">삭제</button>' +
+        '</div>';
+      });
+    }
+
+    if(remaining.length){
+      html += '<div class="cert-entry-add">' +
+        '<select class="ti-sel" id="' + selectId + '">' +
+          '<option value="">자격증 추가 선택</option>';
+      remaining.forEach(function(name){
+        html += '<option value="' + esc(name) + '">' + esc(name) + '</option>';
+      });
+      html += '</select>' +
+        '<select class="ti-sel" id="' + statusId + '">' +
+          '<option value="취득">취득</option>' +
+          '<option value="미취득">미취득</option>' +
+        '</select>' +
+        '<button class="a-btn sm primary" onclick="PageCertCenter.addStudentCert(\'' + quote(student.id) + '\')">추가</button>' +
+      '</div>';
+    }else{
+      html += '<div class="cert-entry-full">등록 가능한 자격증을 모두 선택했습니다.</div>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
   function renderSheet(){
     var doc = ensureClassDoc(state.selectedClass);
     var progress = getClassProgress(doc);
@@ -761,6 +863,7 @@ var PageCertCenter = (function(){
       '<div class="card">' +
         '<div class="card-h">반별 직접 입력<span class="right">' + esc(getClassLabel(state.selectedClass)) + '</span></div>' +
         renderClassSelector(state.selectedClass) +
+        '<div class="cert-guide"><b>직접 입력 안내</b><br>이 화면은 담임이 가장 빠르게 쓰는 입력 시트입니다. 자격증은 취득 여부, 방과후는 참여 여부만 바로 선택하고, 상세 출석률이나 목표 자격증은 방과후 업로드에서 추가로 덧붙이면 됩니다.</div>' +
         '<div class="cert-toolbar-row">' +
           '<div class="cert-status-badge">학생 수 ' + doc.students.length + '명</div>' +
           '<div class="cert-status-badge">입력률 ' + progress.rate + '%</div>' +
@@ -783,10 +886,8 @@ var PageCertCenter = (function(){
         '<table class="a-table cert-sheet-table">' +
           '<thead><tr>' +
             '<th class="cert-sticky-1">번호</th>' +
-            '<th class="cert-sticky-2">이름</th>';
-    state.config.certs.forEach(function(name){
-      html += '<th><div class="cert-col-head">' + esc(name) + '</div></th>';
-    });
+            '<th class="cert-sticky-2">이름</th>' +
+            '<th><div class="cert-col-head">자격증 현황</div></th>';
     state.config.programs.forEach(function(name){
       html += '<th><div class="cert-col-head">' + esc(name) + '</div></th>';
     });
@@ -795,14 +896,8 @@ var PageCertCenter = (function(){
     doc.students.forEach(function(student){
       html += '<tr>' +
         '<td class="cert-sticky-1">' + student.number + '</td>' +
-        '<td class="cert-sticky-2"><div class="cert-student-name">' + esc(student.name) + '</div><div class="cert-student-sub">' + esc(student.classCode) + '</div></td>';
-      state.config.certs.forEach(function(name, certIndex){
-        html += '<td><select class="ti-sel" onchange="PageCertCenter.updateCert(\'' + quote(student.id) + '\',' + certIndex + ',this.value)">';
-        CERT_OPTIONS.forEach(function(option){
-          html += '<option value="' + esc(option) + '"' + (student.certs[name] === option ? ' selected' : '') + '>' + esc(option) + '</option>';
-        });
-        html += '</select></td>';
-      });
+        '<td class="cert-sticky-2"><div class="cert-student-name">' + esc(student.name) + '</div><div class="cert-student-sub">' + esc(student.classCode) + ' · 자격증 ' + getActiveCertNames(student).length + '건</div></td>' +
+        '<td>' + renderStudentCertManager(student) + '</td>';
       state.config.programs.forEach(function(name, programIndex){
         var entry = student.programs[name] || { status: '선택' };
         html += '<td><select class="ti-sel" onchange="PageCertCenter.updateProgramStatus(\'' + quote(student.id) + '\',' + programIndex + ',this.value)">';
@@ -832,6 +927,7 @@ var PageCertCenter = (function(){
       '<div class="card">' +
         '<div class="card-h">반별 업로드</div>' +
         renderClassSelector(state.selectedClass) +
+        '<div class="cert-guide"><b>반별 업로드 안내</b><br>파일에 값이 들어 있는 칸만 반영하고, 비어 있는 칸은 기존 값을 유지합니다. 그래서 직접 입력한 값이 있어도 같은 칸을 다시 올리지 않으면 보존됩니다.</div>' +
         '<div class="cert-toolbar-row">' +
           '<button class="a-btn outline" onclick="PageCertCenter.downloadClassTemplate()">반별 업로드 양식 다운로드</button>' +
           '<input type="file" id="certClassUploadInput" accept=".csv,.xlsx,.xls">' +
@@ -897,6 +993,7 @@ var PageCertCenter = (function(){
     var html = '' +
       '<div class="card">' +
         '<div class="card-h">방과후 업로드</div>' +
+        '<div class="cert-guide"><b>방과후 업로드 안내</b><br>학생별 참여 여부, 출석률, 목표 자격증, 자격증 결과를 한 번에 넣는 화면입니다. 빈 칸은 기존값을 유지하도록 처리해서 직접입력과 섞여도 덜 충돌하게 맞춰두었습니다.</div>' +
         '<div class="cert-stack">' +
           '<label class="cert-inline-field cert-grow"><span>방과후명</span><input class="ti-input" list="certProgramListUpload" value="' + esc(state.programDraft.name) + '" placeholder="예: 방과후 용접 실기" onchange="PageCertCenter.setProgramDraft(\'name\', this.value)"></label>' +
           '<label class="cert-inline-field"><span>담당 교사</span><input class="ti-input" value="' + esc(state.programDraft.teacher) + '" onchange="PageCertCenter.setProgramDraft(\'teacher\', this.value)"></label>' +
@@ -949,6 +1046,7 @@ var PageCertCenter = (function(){
     var html = '' +
       '<div class="card">' +
         '<div class="card-h">업로드 기록<span class="right">누가 언제 무엇을 반영했는지 남깁니다.</span></div>' +
+        '<div class="cert-guide"><b>기록 확인 안내</b><br>반영 흔적을 남겨서 담당이 바뀌어도 흐름을 따라갈 수 있게 했습니다. 같은 학반을 여러 사람이 동시에 수정하면 최신 저장이 우선될 수 있으니, 중요한 반은 업로드 전후로 기록과 갱신 시각을 같이 보는 것이 안전합니다.</div>' +
         '<div class="cert-table-shell">' +
           '<table class="a-table cert-summary-table">' +
             '<thead><tr><th>시각</th><th>작성자</th><th>유형</th><th>대상</th><th>메모</th></tr></thead><tbody>';
@@ -1074,23 +1172,35 @@ var PageCertCenter = (function(){
     ctx.fillText('자격증 취득률', 0, 0);
     ctx.restore();
 
-    stats.classes.forEach(function(item){
-      var x = padLeft + (plotW * item.programRate / 100);
-      var y = padTop + plotH - (plotH * item.certRate / 100);
+    var samePointMap = {};
+    var palette = ['#226bd6', '#0f9d58', '#d97706', '#7c3aed', '#db2777', '#0891b2'];
+
+    stats.classes.forEach(function(item, index){
+      var baseX = padLeft + (plotW * item.programRate / 100);
+      var baseY = padTop + plotH - (plotH * item.certRate / 100);
+      var key = Math.round(item.programRate) + '|' + Math.round(item.certRate);
+      var count = samePointMap[key] || 0;
+      samePointMap[key] = count + 1;
+
+      var angle = (Math.PI / 3) * count;
+      var offset = count === 0 ? 0 : Math.min(26, 8 + count * 3);
+      var x = baseX + Math.cos(angle) * offset;
+      var y = baseY + Math.sin(angle) * offset;
       var r = 6 + (item.inputRate / 25);
+      var color = palette[index % palette.length];
       ctx.fillStyle = 'rgba(34, 107, 214, 0.18)';
       ctx.beginPath();
       ctx.arc(x, y, r + 4, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#226bd6';
+      ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#172033';
       ctx.font = '12px Noto Sans KR, sans-serif';
-      ctx.fillText(item.code, x + r + 4, y - 2);
+      ctx.fillText(item.code, x + r + 5, y - 2);
     });
   }
 
@@ -1170,20 +1280,111 @@ var PageCertCenter = (function(){
     var db = fdb();
     var doc = ensureClassDoc(code);
     if(!doc) return Promise.resolve();
-    doc.updated = new Date().toISOString();
-    doc.updatedBy = App.getUser ? (App.getUser() || '') : '';
-    cacheState();
-    if(!db) return Promise.resolve();
-    return db.collection(CLASS_COLLECTION).doc(code).set(doc);
+    var nextUpdated = new Date().toISOString();
+    var nextWriter = App.getUser ? (App.getUser() || '') : '';
+    if(!db){
+      doc.updated = nextUpdated;
+      doc.syncedUpdated = nextUpdated;
+      doc.updatedBy = nextWriter;
+      cacheState();
+      return Promise.resolve();
+    }
+
+    return db.collection(CLASS_COLLECTION).doc(code).get().then(function(snapshot){
+      var remote = snapshot && snapshot.exists ? (snapshot.data() || {}) : {};
+      var remoteUpdated = remote.updated || '';
+      var baseUpdated = doc.syncedUpdated || '';
+
+      if(remoteUpdated && baseUpdated && remoteUpdated !== baseUpdated){
+        var conflict = new Error('stale-class-write');
+        conflict.code = 'stale-class-write';
+        throw conflict;
+      }
+
+      doc.updated = nextUpdated;
+      doc.syncedUpdated = nextUpdated;
+      doc.updatedBy = nextWriter;
+      cacheState();
+      return db.collection(CLASS_COLLECTION).doc(code).set(doc);
+    });
+  }
+
+  function reloadFromSource(){
+    state.loaded = false;
+    state.loading = false;
+    renderLoading();
+    loadAll();
   }
 
   function saveConfig(){
     var db = fdb();
-    state.config.updatedAt = new Date().toISOString();
-    state.config.updatedBy = App.getUser ? (App.getUser() || '') : '';
-    cacheState();
-    if(!db) return Promise.resolve();
-    return db.collection(META_COLLECTION).doc('config').set(state.config);
+    var nextUpdated = new Date().toISOString();
+    var nextWriter = App.getUser ? (App.getUser() || '') : '';
+    if(!db){
+      state.config.updatedAt = nextUpdated;
+      state.config.syncedUpdatedAt = nextUpdated;
+      state.config.updatedBy = nextWriter;
+      cacheState();
+      return Promise.resolve();
+    }
+    return db.collection(META_COLLECTION).doc('config').get().then(function(snapshot){
+      var remote = snapshot && snapshot.exists ? (snapshot.data() || {}) : {};
+      var remoteUpdated = remote.updatedAt || '';
+      var baseUpdated = state.config.syncedUpdatedAt || '';
+
+      if(remoteUpdated && baseUpdated && remoteUpdated !== baseUpdated){
+        if(typeof toast === 'function') toast('Another device changed the shared item list. Refresh and try again.');
+        reloadFromSource();
+        var conflict = new Error('stale-config-write');
+        conflict.code = 'stale-config-write';
+        throw conflict;
+      }
+
+      state.config.updatedAt = nextUpdated;
+      state.config.syncedUpdatedAt = nextUpdated;
+      state.config.updatedBy = nextWriter;
+      cacheState();
+      return db.collection(META_COLLECTION).doc('config').set(state.config);
+    });
+  }
+
+  function commitClassWrites(changedMap){
+    var codes = Object.keys(changedMap || {});
+    var result = {
+      total: codes.length,
+      saved: [],
+      stale: [],
+      failed: []
+    };
+
+    return codes.reduce(function(chain, code){
+      return chain.then(function(){
+        return writeClassDoc(code).then(function(){
+          result.saved.push(code);
+        }).catch(function(error){
+          console.error('cert center bulk save error:', code, error);
+          if(error && error.code === 'stale-class-write'){
+            result.stale.push(code);
+            return;
+          }
+          result.failed.push({
+            code: code,
+            error: error
+          });
+        });
+      });
+    }, Promise.resolve()).then(function(){
+      if(result.stale.length){
+        reloadFromSource();
+      }
+      if(result.stale.length || result.failed.length){
+        var partialError = new Error('bulk-save-partial');
+        partialError.code = 'bulk-save-partial';
+        partialError.result = result;
+        throw partialError;
+      }
+      return result;
+    });
   }
 
   function queueClassSave(code){
@@ -1191,6 +1392,10 @@ var PageCertCenter = (function(){
     saveTimers[code] = setTimeout(function(){
       writeClassDoc(code).catch(function(error){
         console.error('cert center class save error:', error);
+        if(error && error.code === 'stale-class-write' && typeof toast === 'function'){
+          toast('\ub2e4\ub978 \uae30\uae30\uc5d0\uc11c \uba3c\uc800 \uc218\uc815\ub41c \ubc18\uc785\ub2c8\ub2e4. \uc0c8\ub85c \ubd88\ub7ec\uc624\uae30 \ud6c4 \ub2e4\uc2dc \uc800\uc7a5\ud574 \uc8fc\uc138\uc694.');
+          reloadFromSource();
+        }
       });
     }, 400);
   }
@@ -1637,6 +1842,35 @@ var PageCertCenter = (function(){
       queueClassSave(state.selectedClass);
       render();
     },
+    updateStudentCertByName: function(studentId, certName, value){
+      var student = findStudentById(state.selectedClass, studentId);
+      if(!student || !certName) return;
+      student.certs[certName] = normalizeCertStatus(value);
+      queueClassSave(state.selectedClass);
+      render();
+    },
+    removeStudentCert: function(studentId, certName){
+      var student = findStudentById(state.selectedClass, studentId);
+      if(!student || !certName) return;
+      student.certs[certName] = '선택';
+      queueClassSave(state.selectedClass);
+      render();
+    },
+    addStudentCert: function(studentId){
+      var student = findStudentById(state.selectedClass, studentId);
+      if(!student) return;
+      var baseId = domSafeId(student.id);
+      var certEl = document.getElementById('certAdd_' + baseId);
+      var statusEl = document.getElementById('certAddStatus_' + baseId);
+      var certName = tidyText(certEl && certEl.value);
+      if(!certName){
+        if(typeof toast === 'function') toast('추가할 자격증을 선택해 주세요.');
+        return;
+      }
+      student.certs[certName] = normalizeCertStatus(statusEl && statusEl.value ? statusEl.value : '미취득');
+      queueClassSave(state.selectedClass);
+      render();
+    },
     addCert: function(){
       var input = document.getElementById('certItemInput');
       var name = tidyText(input && input.value);
@@ -1695,12 +1929,30 @@ var PageCertCenter = (function(){
           changed[classCode] = true;
           count += 1;
         });
-        Promise.all(Object.keys(changed).map(writeClassDoc)).then(function(){
+        commitClassWrites(changed).then(function(result){
+          var savedCount = result.saved.length;
+          var staleCount = result.stale.length;
+          var failedCount = result.failed.length;
+          var summary = savedCount + '\uac1c \ubc18 \ubc18\uc601';
+          if(staleCount) summary += ', ' + staleCount + '\uac1c \ubc18 \ucd94\ub3cc';
+          if(failedCount) summary += ', ' + failedCount + '\uac1c \ubc18 \uc624\ub958';
           addLog('반별 업로드', state.selectedClass, (file && file.name ? file.name : '파일') + ' 반영, ' + count + '행 처리');
           render();
           if(typeof toast === 'function') toast('반별 업로드가 반영되었습니다.');
         }).catch(function(saveError){
           console.error(saveError);
+          if(saveError && saveError.code === 'bulk-save-partial' && typeof toast === 'function'){
+            var partial = saveError.result || { saved: [], stale: [], failed: [] };
+            var partialSummary = partial.saved.length + '\uac1c \ubc18 \ubc18\uc601';
+            if(partial.stale.length) partialSummary += ', ' + partial.stale.length + '\uac1c \ubc18 \ucd94\ub3cc';
+            if(partial.failed.length) partialSummary += ', ' + partial.failed.length + '\uac1c \ubc18 \uc624\ub958';
+            toast('\ubc18\ubcc4 \uc5c5\ub85c\ub4dc\uac00 \ubd80\ubd84 \ubc18\uc601\ub418\uc5c8\uc2b5\ub2c8\ub2e4. ' + partialSummary);
+            return;
+          }
+          if(saveError && saveError.code === 'stale-class-write' && typeof toast === 'function'){
+            toast('다른 기기에서 먼저 수정된 반이 있어 업로드를 멈췄습니다. 새로 불러오기 후 다시 시도해 주세요.');
+            return;
+          }
           if(typeof toast === 'function') toast('업로드 저장 중 오류가 발생했습니다.');
         });
       });
@@ -1748,40 +2000,68 @@ var PageCertCenter = (function(){
           var rowProgram = tidyText(getField(row, ['방과후명', '프로그램', 'program'])) || programName;
           var rowTeacher = tidyText(getField(row, ['담당교사', '담당', 'teacher'])) || teacher;
           var rowSchedule = tidyText(getField(row, ['운영시기', '일시', 'schedule'])) || schedule;
-          var rowTargetCert = tidyText(getField(row, ['목표자격증', '목표자격', 'targetcert'])) || targetCert;
-          var rowStatus = normalizeProgramStatus(getField(row, ['참여여부', '참여상태', 'status']) || '선택');
-          var rowAttendance = normalizeAttendance(getField(row, ['출석률', 'attendance']));
-          var rowCertResult = normalizeCertStatus(getField(row, ['자격증결과', '자격증취득', '결과', 'certresult']));
-          var rowNote = tidyText(getField(row, ['비고', 'note', 'memo']));
+          var rawTargetCert = tidyText(getField(row, ['목표자격증', '목표자격', 'targetcert']));
+          var rawStatus = tidyText(getField(row, ['참여여부', '참여상태', 'status']));
+          var rawAttendance = tidyText(getField(row, ['출석률', 'attendance']));
+          var rawCertResult = tidyText(getField(row, ['자격증결과', '자격증취득', '결과', 'certresult']));
+          var rawNote = tidyText(getField(row, ['비고', 'note', 'memo']));
           var classCode = findClassCodeFromValue(getField(row, ['학반', '반', 'class', 'classcode']));
           var number = parseInt(getField(row, ['번호', 'num', 'number']), 10) || 0;
           if(!classCode || !number) return;
-          if(rowTargetCert) maybeAddCertItem(rowTargetCert);
-          maybeAddProgramItem(rowProgram, rowTeacher, rowSchedule, rowTargetCert);
+          if(rawTargetCert) maybeAddCertItem(rawTargetCert);
+          maybeAddProgramItem(rowProgram, rowTeacher, rowSchedule, rawTargetCert || targetCert);
           var student = findStudentByNumber(classCode, number, true);
           if(!student) return;
           var name = tidyText(getField(row, ['이름', 'name']));
           if(name) student.name = name;
           if(!student.programs[rowProgram]){
-            student.programs[rowProgram] = { status: '선택', attendance: '', targetCert: rowTargetCert, certResult: '선택', note: '', updatedAt: '', updatedBy: '' };
+            student.programs[rowProgram] = { status: '선택', attendance: '', targetCert: rawTargetCert || targetCert || '', certResult: '선택', note: '', updatedAt: '', updatedBy: '' };
           }
-          student.programs[rowProgram].status = rowStatus;
-          student.programs[rowProgram].attendance = rowAttendance;
-          student.programs[rowProgram].targetCert = rowTargetCert;
-          student.programs[rowProgram].certResult = rowCertResult;
-          student.programs[rowProgram].note = rowNote;
+          var programEntry = student.programs[rowProgram];
+          if(rawStatus) programEntry.status = normalizeProgramStatus(rawStatus);
+          if(rawAttendance) programEntry.attendance = normalizeAttendance(rawAttendance);
+          if(rawTargetCert) programEntry.targetCert = rawTargetCert;
+          else if(!programEntry.targetCert && targetCert) programEntry.targetCert = targetCert;
+          if(rawCertResult) programEntry.certResult = normalizeCertStatus(rawCertResult);
+          if(rawNote) programEntry.note = rawNote;
           student.programs[rowProgram].updatedAt = new Date().toISOString();
           student.programs[rowProgram].updatedBy = App.getUser ? (App.getUser() || '') : '';
-          if(rowTargetCert){ student.certs[rowTargetCert] = rowCertResult !== '선택' ? rowCertResult : student.certs[rowTargetCert]; }
+          if(programEntry.targetCert && rawCertResult){
+            var normalizedResult = normalizeCertStatus(rawCertResult);
+            if(normalizedResult !== '선택'){
+              student.certs[programEntry.targetCert] = normalizedResult;
+            }
+          }
           changed[classCode] = true;
           count += 1;
         });
-        saveConfig().then(function(){ return Promise.all(Object.keys(changed).map(writeClassDoc)); }).then(function(){
+        saveConfig().then(function(){ return commitClassWrites(changed); }).then(function(result){
+          var savedCount = result.saved.length;
+          var staleCount = result.stale.length;
+          var failedCount = result.failed.length;
+          var summary = savedCount + '\uac1c \ubc18 \ubc18\uc601';
+          if(staleCount) summary += ', ' + staleCount + '\uac1c \ubc18 \ucd94\ub3cc';
+          if(failedCount) summary += ', ' + failedCount + '\uac1c \ubc18 \uc624\ub958';
           addLog('방과후 업로드', programName, (file && file.name ? file.name : '파일') + ' 반영, ' + count + '행 처리');
           render();
           if(typeof toast === 'function') toast('방과후 업로드가 반영되었습니다.');
         }).catch(function(saveError){
           console.error(saveError);
+          if(saveError && saveError.code === 'stale-config-write'){
+            return;
+          }
+          if(saveError && saveError.code === 'bulk-save-partial' && typeof toast === 'function'){
+            var partial = saveError.result || { saved: [], stale: [], failed: [] };
+            var partialSummary = partial.saved.length + '\uac1c \ubc18 \ubc18\uc601';
+            if(partial.stale.length) partialSummary += ', ' + partial.stale.length + '\uac1c \ubc18 \ucd94\ub3cc';
+            if(partial.failed.length) partialSummary += ', ' + partial.failed.length + '\uac1c \ubc18 \uc624\ub958';
+            toast('\ubc29\uacfc\ud6c4 \uc5c5\ub85c\ub4dc\uac00 \ubd80\ubd84 \ubc18\uc601\ub418\uc5c8\uc2b5\ub2c8\ub2e4. ' + partialSummary);
+            return;
+          }
+          if(saveError && saveError.code === 'stale-class-write' && typeof toast === 'function'){
+            toast('다른 기기에서 먼저 수정된 반이 있어 저장을 멈췄습니다. 새로 불러오기 후 다시 시도해 주세요.');
+            return;
+          }
           if(typeof toast === 'function') toast('방과후 저장 중 오류가 발생했습니다.');
         });
       });
