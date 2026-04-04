@@ -9,13 +9,28 @@ var PageHome=(function(){
     return d;
   }
 
+  function resolveSwapWeek(item){
+    if(item && item.week) return String(item.week);
+    if(item && item.classDate){
+      var classDate=new Date(item.classDate+'T00:00:00');
+      if(!isNaN(classDate.getTime())) return Store.weekKey(classDate);
+    }
+    if(item && item.date){
+      var savedAt=new Date(item.date);
+      if(!isNaN(savedAt.getTime())) return Store.weekKey(savedAt);
+    }
+    return '';
+  }
+
   function render(){
     var U=App.getUser(), today=Engine.today(), np=Engine.nowP(), wk=Store.weekKey();
     var cnt=0;
     if(today) for(var p=0;p<DP[today];p++){if(Engine.slot(U,today,p))cnt++}
     var tasks=Store.getTasks(), tc=0;
     for(var d in tasks){var a=tasks[d]||[];for(var i=0;i<a.length;i++)if(!a[i].done)tc++}
-    var hist=Store.getSwapHistory().filter(function(h){return h.status==='applied'&&h.week===wk});
+    var hist=Store.getSwapHistory().filter(function(h){
+      return h && h.status==='applied' && resolveSwapWeek(h)===wk;
+    });
 
     var h='';
 

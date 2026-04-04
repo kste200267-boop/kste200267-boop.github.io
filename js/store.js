@@ -214,6 +214,55 @@ var Store = (function(){
     return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
   }
 
+  function parseDateInput(value){
+    if(!value) return null;
+    var date;
+    if(value instanceof Date){
+      date = new Date(value.getTime());
+    }else if(typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)){
+      date = new Date(value + 'T00:00:00');
+    }else{
+      date = new Date(value);
+    }
+    if(isNaN(date.getTime())) return null;
+    return date;
+  }
+
+  function resolveSwapWeek(sw){
+    sw = safeObject(sw);
+    if(sw.week) return String(sw.week);
+    var date = parseDateInput(sw.classDate || sw.targetDate || sw.date || '');
+    return weekKey(date || new Date());
+  }
+
+  function hasTeacherSwapConflict(item, sw){
+    if(!item || item.status !== 'applied') return false;
+    if(resolveSwapWeek(item) !== resolveSwapWeek(sw)) return false;
+    return item.teacher === sw.teacher && item.day === sw.day && Number(item.period) === Number(sw.period);
+  }
+
+  function hasSubstituteSwapConflict(item, sw){
+    if(!item || item.status !== 'applied') return false;
+    if(resolveSwapWeek(item) !== resolveSwapWeek(sw)) return false;
+    return item.substitute === sw.substitute && item.day === sw.day && Number(item.period) === Number(sw.period);
+  }
+
+  function checkSwapConflict(sw){
+    sw = safeObject(sw);
+    sw.week = resolveSwapWeek(sw);
+    var history = safeArray(get('swap-history', []));
+    for(var i = 0; i < history.length; i += 1){
+      var item = history[i];
+      if(hasTeacherSwapConflict(item, sw)){
+        return { ok: false, code: 'teacher-slot-conflict', week: sw.week };
+      }
+      if(hasSubstituteSwapConflict(item, sw)){
+        return { ok: false, code: 'substitute-slot-conflict', week: sw.week };
+      }
+    }
+    return { ok: true, week: sw.week };
+  }
+
   return {
     get: get,
     set: set,
@@ -231,9 +280,14 @@ var Store = (function(){
       var h = safeArray(get('swap-history', []));
       sw = safeObject(sw);
 
+      var conflict = checkSwapConflict(sw);
+      if(!conflict.ok){
+        return conflict;
+      }
+
       sw.id = Date.now() + '-' + Math.random().toString(36).substr(2, 5);
       sw.date = new Date().toISOString();
-      sw.week = weekKey();
+      sw.week = conflict.week;
       sw.status = 'applied';
 
       h.unshift(sw);
@@ -255,10 +309,12 @@ var Store = (function(){
           h[i].cancelledAt = new Date().toISOString();
 
           var all = safeObject(get('week-overrides', {}));
-          if(all[h[i].week]){
-            delete all[h[i].week][h[i].teacher + '|' + h[i].day + '|' + h[i].period];
-            if(!Object.keys(all[h[i].week]).length){
-              delete all[h[i].week];
+          var itemWeek = resolveSwapWeek(h[i]);
+          h[i].week = itemWeek;
+          if(all[itemWeek]){
+            delete all[itemWeek][h[i].teacher + '|' + h[i].day + '|' + h[i].period];
+            if(!Object.keys(all[itemWeek]).length){
+              delete all[itemWeek];
             }
             set('week-overrides', all);
           }
@@ -272,6 +328,7 @@ var Store = (function(){
       var all = safeObject(get('week-overrides', {}));
       return safeObject(all[wk || weekKey()]);
     },
+    checkSwapConflict: checkSwapConflict,
 
     getTasks: function(){
       return safeObject(get('tasks', {}));

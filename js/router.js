@@ -144,6 +144,9 @@ var Router = (function(){
       }
 
       try{
+        if(typeof Engine !== 'undefined' && Engine && typeof Engine.rebuild === 'function'){
+          Engine.rebuild();
+        }
         pages[id].render();
       }catch(e){
         console.error('Page render error [' + id + ']:', e);
